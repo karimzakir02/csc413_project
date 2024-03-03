@@ -1,6 +1,9 @@
 import numpy as np
+from PIL import Image
 import torch
 import torchvision
+
+import os
 
 
 COLOR_ARR_LST = np.array([
@@ -30,14 +33,40 @@ COLOR_NAME_LST = [
 
 
 def color_image(img, label):
-    return np.array(img.convert("RGB")) * COLOR_ARR_LST[label] / 255
+    return (np.array(img.convert("RGB")) * COLOR_ARR_LST[label]).astype(np.uint8)
 
 
 def main():
-    MNIST = torchvision.datasets.MNIST("./data", download=True)
-    X, y = MNIST[0]
-    if y != 9:  # not doing this for 9, excluded from the dataset
-        colored_img = color_image(X, y)
+    MNIST_train = torchvision.datasets.MNIST("./data", download=True)
+    MNIST_val = torchvision.datasets.MNIST("./data", train=False, download=True)
+
+    cmnist_path = os.path.join("data", "CMNIST")
+    if not os.path.isdir(cmnist_path):
+        os.mkdir(cmnist_path)
+
+    training_path = os.path.join(cmnist_path, "training")
+    if not os.path.isdir(training_path):
+        os.mkdir(training_path)
+
+    val_path = os.path.join(cmnist_path, "validation")
+    if not os.path.isdir(val_path):
+        os.mkdir(val_path)
+
+    for i in range(9):
+        os.mkdir(os.path.join(training_path, str(i)))
+
+    counter = 0
+    for img, label in MNIST_train:
+        if label == 9:  # skip 9 for now
+            continue
+
+        colored_img = color_image(img, label)
+        im = Image.fromarray(colored_img)
+        img_path = os.path.join(training_path, str(label),
+                                f"{label}_{counter}.jpeg")
+        
+        im.save(img_path)
+        counter += 1
 
 
 if __name__=="__main__":
