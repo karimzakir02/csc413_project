@@ -37,6 +37,7 @@ def color_image(img, label):
 
 
 def create_dataset():
+    # TODO: need to change colors for the validation set
     MNIST_train = torchvision.datasets.MNIST("./data", download=True)
     MNIST_val = torchvision.datasets.MNIST("./data", train=False, download=True)
 
