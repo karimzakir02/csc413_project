@@ -36,7 +36,7 @@ def color_image(img, label):
     return (np.array(img.convert("RGB")) * COLOR_ARR_LST[label]).astype(np.uint8)
 
 
-def main():
+def create_dataset():
     MNIST_train = torchvision.datasets.MNIST("./data", download=True)
     MNIST_val = torchvision.datasets.MNIST("./data", train=False, download=True)
 
@@ -47,13 +47,14 @@ def main():
     training_path = os.path.join(cmnist_path, "training")
     if not os.path.isdir(training_path):
         os.mkdir(training_path)
+        for i in range(9):
+            os.mkdir(os.path.join(training_path, str(i)))
 
     val_path = os.path.join(cmnist_path, "validation")
     if not os.path.isdir(val_path):
         os.mkdir(val_path)
-
-    for i in range(9):
-        os.mkdir(os.path.join(training_path, str(i)))
+        for i in range(9):
+            os.mkdir(os.path.join(val_path, str(i)))
 
     counter = 0
     for img, label in MNIST_train:
@@ -68,6 +69,17 @@ def main():
         im.save(img_path)
         counter += 1
 
+    for img, label in MNIST_val:
+        if label == 9:
+            continue
+        colored_img = color_image(img, label)
+        im = Image.fromarray(colored_img)
+        img_path = os.path.join(val_path, str(label),
+                                f"{label}_{counter}.jpeg")
+        
+        im.save(img_path)
+        counter += 1
+
 
 if __name__=="__main__":
-    main()
+    create_dataset()
