@@ -37,7 +37,7 @@ class CMNIST(torch.utils.data.Dataset):
     def __init__(self, root="data", training=True, exclude_digits=None):
         super().__init__()
         
-        path = os.path.join("data", "CMNIST", 
+        path = os.path.join(root, "CMNIST", 
                             "training" if training else "validation")
         self.dataset = torchvision.datasets.ImageFolder(path)
 
