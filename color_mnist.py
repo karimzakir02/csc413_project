@@ -32,6 +32,22 @@ COLOR_NAME_LST = [
 ]
 
 
+class CMNIST(torch.utils.data.Dataset):
+
+    def __init__(self, root="data", training=True, exclude_digits=None):
+        super().__init__()
+        
+        path = os.path.join("data", "CMNIST", 
+                            "training" if training else "validation")
+        self.dataset = torchvision.datasets.ImageFolder(path)
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        return self.dataset[idx]
+
+
 def color_image(img, label):
     return (np.array(img.convert("RGB")) * COLOR_ARR_LST[label]).astype(np.uint8)
 
@@ -83,4 +99,4 @@ def create_dataset():
 
 
 if __name__=="__main__":
-    create_dataset()
+    pass
