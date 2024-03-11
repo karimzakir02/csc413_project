@@ -4,6 +4,7 @@ import torch
 import torchvision
 
 import os
+import pathlib
 
 
 COLOR_ARR_LST = np.array([
@@ -36,10 +37,17 @@ class CMNIST(torch.utils.data.Dataset):
 
     def __init__(self, root="data", training=True, exclude_digits=None):
         super().__init__()
-        
         path = os.path.join(root, "CMNIST", 
                             "training" if training else "validation")
-        self.dataset = torchvision.datasets.ImageFolder(path)
+        
+        init_dataset = torchvision.datasets.ImageFolder(path,
+                                                   transform=torchvision.transforms.ToTensor())
+    
+        if exclude_digits is None:
+            exclude_digits = []
+
+        subset_idx = (~np.isin(init_dataset.targets, exclude_digits)).nonzero()[0]
+        self.dataset = torch.utils.data.Subset(init_dataset, subset_idx)
 
     def __len__(self):
         return len(self.dataset)
@@ -99,4 +107,4 @@ def create_dataset():
 
 
 if __name__=="__main__":
-    pass
+    dataset = CMNIST(exclude_digits=[0])
