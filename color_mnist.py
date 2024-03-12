@@ -72,6 +72,9 @@ def color_image_random(img):
 def create_dataset(seed=413):
     random.seed(seed)
 
+    if not os.path.isdir("data"):
+        os.mkdir("data")
+
     MNIST_train = torchvision.datasets.MNIST("./data", download=True)
     MNIST_val = torchvision.datasets.MNIST("./data", train=False, download=True)
 
