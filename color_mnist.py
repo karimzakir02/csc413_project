@@ -4,7 +4,7 @@ import torch
 import torchvision
 
 import os
-import pathlib
+import random
 
 
 COLOR_ARR_LST = np.array([
@@ -56,12 +56,20 @@ class CMNIST(torch.utils.data.Dataset):
         return self.dataset[idx]
 
 
-def color_image(img, label):
+def color_image_by_label(img, label):
     return (np.array(img.convert("RGB")) * COLOR_ARR_LST[label]).astype(np.uint8)
 
 
-def create_dataset():
-    # TODO: need to change colors for the validation set
+def color_image_random(img):
+    color_idx = random.randrange(len(COLOR_ARR_LST))
+    color_name = COLOR_NAME_LST[color_idx]
+    return ((np.array(img.convert("RGB")) * COLOR_ARR_LST[color_idx]).astype(np.uint8), 
+            color_name)
+
+
+def create_dataset(seed=413):
+    random.seed(seed)
+
     MNIST_train = torchvision.datasets.MNIST("./data", download=True)
     MNIST_val = torchvision.datasets.MNIST("./data", train=False, download=True)
 
@@ -72,13 +80,13 @@ def create_dataset():
     training_path = os.path.join(cmnist_path, "training")
     if not os.path.isdir(training_path):
         os.mkdir(training_path)
-        for i in range(9):
+        for i in range(10):
             os.mkdir(os.path.join(training_path, str(i)))
 
     val_path = os.path.join(cmnist_path, "validation")
     if not os.path.isdir(val_path):
         os.mkdir(val_path)
-        for i in range(9):
+        for i in range(10):
             os.mkdir(os.path.join(val_path, str(i)))
 
     counter = 0
@@ -86,25 +94,25 @@ def create_dataset():
         if label == 9:  # skip 9 for now
             continue
 
-        colored_img = color_image(img, label)
+        colored_img = color_image_by_label(img, label)
         im = Image.fromarray(colored_img)
         img_path = os.path.join(training_path, str(label),
                                 f"{label}_{counter}.jpeg")
-        
+
         im.save(img_path)
         counter += 1
 
+    counter = 0
     for img, label in MNIST_val:
-        if label == 9:
-            continue
-        colored_img = color_image(img, label)
+
+        colored_img, color = color_image_random(img)
         im = Image.fromarray(colored_img)
         img_path = os.path.join(val_path, str(label),
-                                f"{label}_{counter}.jpeg")
-        
+                                f"{color}_{counter}.jpeg")
+
         im.save(img_path)
         counter += 1
 
 
 if __name__=="__main__":
-    dataset = CMNIST(exclude_digits=[0])
+    create_dataset()
