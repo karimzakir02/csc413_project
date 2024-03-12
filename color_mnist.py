@@ -9,27 +9,29 @@ import random
 
 COLOR_ARR_LST = np.array([
     [1, 0, 0],  # red
-    [0, 1, 0],  # green
+    [0, 1, 0],  # lime
     [0, 0, 1],  # blue
     [1, 165/255, 0],  # orange
     [128/255, 0, 128/255],  # purple
     [1, 1, 0],  # yellow
     [1, 192/255, 203/255],  # pink
     [0, 128/255, 128/255],  # teal
-    [1, 1, 1]  # white
+    [1, 1, 1],  # white
+    [0, 128/255, 0]  # green
 ])
 
 
 COLOR_NAME_LST = [
     "red",
-    "green",
+    "lime",
     "blue",
     "orange",
     "purple",
     "yellow",
     "pink",
     "teal",
-    "white"
+    "white",
+    "green"
 ]
 
 
@@ -91,9 +93,6 @@ def create_dataset(seed=413):
 
     counter = 0
     for img, label in MNIST_train:
-        if label == 9:  # skip 9 for now
-            continue
-
         colored_img = color_image_by_label(img, label)
         im = Image.fromarray(colored_img)
         img_path = os.path.join(training_path, str(label),
