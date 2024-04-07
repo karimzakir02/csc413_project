@@ -38,10 +38,10 @@ DIR_DATA = "../data"
 
 class CMNIST(torch.utils.data.Dataset):
 
-    def __init__(self, root=DIR_DATA, training=True, exclude_digits=None):
+    def __init__(self, root=DIR_DATA, split="training", exclude_digits=None):
         super().__init__()
         path = os.path.join(root, "CMNIST", 
-                            "training" if training else "validation")
+                            split)
         
         init_dataset = torchvision.datasets.ImageFolder(path,
                                                    transform=torchvision.transforms.ToTensor())
@@ -61,7 +61,7 @@ class CMNIST(torch.utils.data.Dataset):
 
 def color_image_by_label(img, label):
     return (np.array(img.convert("RGB")) * COLOR_ARR_LST[label]).astype(np.uint8)
-``
+
 
 def color_image_random(img):
     color_idx = random.randrange(len(COLOR_ARR_LST))
