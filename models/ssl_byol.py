@@ -39,10 +39,10 @@ class SSL_BYOL(nn.Module):
             self.predictor
         )
 
-        self.target_network = deepcopy(
+        self.target_network = deepcopy(nn.Sequential(
             self.encoder,
             self.projector
-        )
+        ))
 
         self.loss_fn = nn.MSELoss()
         self.optimizer = torch.optim.Adam(self.online_network.parameters())  # only want to optimize online network
