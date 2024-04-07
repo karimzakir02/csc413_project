@@ -37,10 +37,10 @@ COLOR_NAME_LST = [
 
 class CMNIST(torch.utils.data.Dataset):
 
-    def __init__(self, root="data", training=True, exclude_digits=None):
+    def __init__(self, root="data", split="training", exclude_digits=None):
         super().__init__()
         path = os.path.join(root, "CMNIST", 
-                            "training" if training else "validation")
+                            split)
         
         init_dataset = torchvision.datasets.ImageFolder(path,
                                                    transform=torchvision.transforms.ToTensor())
@@ -139,4 +139,4 @@ def create_dataset(seed=413):
 
 
 if __name__=="__main__":
-    create_dataset()
+    pass
