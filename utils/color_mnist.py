@@ -34,13 +34,14 @@ COLOR_NAME_LST = [
     "green"
 ]
 
+DIR_DATA = "../data"
 
 class CMNIST(torch.utils.data.Dataset):
 
-    def __init__(self, root="data", split="training", exclude_digits=None):
+    def __init__(self, root=DIR_DATA, training=True, exclude_digits=None):
         super().__init__()
         path = os.path.join(root, "CMNIST", 
-                            split)
+                            "training" if training else "validation")
         
         init_dataset = torchvision.datasets.ImageFolder(path,
                                                    transform=torchvision.transforms.ToTensor())
@@ -60,7 +61,7 @@ class CMNIST(torch.utils.data.Dataset):
 
 def color_image_by_label(img, label):
     return (np.array(img.convert("RGB")) * COLOR_ARR_LST[label]).astype(np.uint8)
-
+``
 
 def color_image_random(img):
     color_idx = random.randrange(len(COLOR_ARR_LST))
@@ -72,18 +73,18 @@ def color_image_random(img):
 def create_dataset(seed=413):
     random.seed(seed)
 
-    if not os.path.isdir("data"):
-        os.mkdir("data")
+    if not os.path.isdir(DIR_DATA):
+        os.mkdir(DIR_DATA)
 
-    MNIST_train = torchvision.datasets.MNIST("./data", download=True)
+    MNIST_train = torchvision.datasets.MNIST(DIR_DATA, download=True)
     training_ix = random.sample(range(len(MNIST_train)), 50000)
     in_distribution_ix = list(set(range(len(MNIST_train))) - set(training_ix))
     MNIST_in_distro = torch.utils.data.Subset(MNIST_train, in_distribution_ix)
     MNIST_train = torch.utils.data.Subset(MNIST_train, training_ix)
 
-    MNIST_val = torchvision.datasets.MNIST("./data", train=False, download=True)
+    MNIST_val = torchvision.datasets.MNIST(DIR_DATA, train=False, download=True)
 
-    cmnist_path = os.path.join("data", "CMNIST")
+    cmnist_path = os.path.join(DIR_DATA, "CMNIST")
     if not os.path.isdir(cmnist_path):
         os.mkdir(cmnist_path)
 
@@ -139,4 +140,4 @@ def create_dataset(seed=413):
 
 
 if __name__=="__main__":
-    pass
+    create_dataset()
