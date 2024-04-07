@@ -76,6 +76,11 @@ def create_dataset(seed=413):
         os.mkdir("data")
 
     MNIST_train = torchvision.datasets.MNIST("./data", download=True)
+    training_ix = random.sample(range(len(MNIST_train)), 50000)
+    in_distribution_ix = list(set(range(len(MNIST_train))) - set(training_ix))
+    MNIST_in_distro = torch.utils.data.Subset(MNIST_train, in_distribution_ix)
+    MNIST_train = torch.utils.data.Subset(MNIST_train, training_ix)
+
     MNIST_val = torchvision.datasets.MNIST("./data", train=False, download=True)
 
     cmnist_path = os.path.join("data", "CMNIST")
@@ -88,7 +93,14 @@ def create_dataset(seed=413):
         for i in range(10):
             os.mkdir(os.path.join(training_path, str(i)))
 
-    val_path = os.path.join(cmnist_path, "validation")
+    in_distro_path = os.path.join(cmnist_path, "in_distribution_validation")
+    if not os.path.isdir(in_distro_path):
+        os.mkdir(in_distro_path)
+        for i in range(10):
+            os.mkdir(os.path.join(in_distro_path, str(i)))
+
+
+    val_path = os.path.join(cmnist_path, "out_distribution_validation")
     if not os.path.isdir(val_path):
         os.mkdir(val_path)
         for i in range(10):
@@ -99,6 +111,16 @@ def create_dataset(seed=413):
         colored_img = color_image_by_label(img, label)
         im = Image.fromarray(colored_img)
         img_path = os.path.join(training_path, str(label),
+                                f"{label}_{counter}.jpeg")
+
+        im.save(img_path)
+        counter += 1
+
+    counter = 0
+    for img, label in MNIST_in_distro:
+        colored_img = color_image_by_label(img, label)
+        im = Image.fromarray(colored_img)
+        img_path = os.path.join(in_distro_path, str(label),
                                 f"{label}_{counter}.jpeg")
 
         im.save(img_path)
