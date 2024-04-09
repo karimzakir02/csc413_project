@@ -89,6 +89,9 @@ class SSL_BYOL(nn.Module):
         train_loss = []
         val_loss = []
 
+        model_save_path = os.path.join("checkpoints", "ssl_byol")
+        encoder_save_path = os.path.join("checkpoints", "ssl_byol_encoder")
+
         for epoch in range(epochs):
             
             self.train(train_loader)
@@ -102,6 +105,11 @@ class SSL_BYOL(nn.Module):
                 print(f"Epoch {epoch}")
                 print(f"Train Loss: {train_loss}")
                 print(f"Validation Loss: {val_loss}")
+
+                # Full model:
+                torch.save(self.state_dict(), os.path.join(model_save_path, f"checkpoint_{epoch + 1}.pt"))
+                # Just encoder:
+                torch.save(self.encoder.state_dict(), os.path.join(encoder_save_path, f"checkpoint_{epoch + 1}.pt"))
         
         return train_loss, val_loss
 
@@ -155,8 +163,7 @@ class SSL_BYOL(nn.Module):
         return loss / count
 
 
-def train_byol():
-    
+def train_byol(): 
     data = load_data()
     
     train_data = torch.utils.data.ConcatDataset([data["id_train_seen"],
