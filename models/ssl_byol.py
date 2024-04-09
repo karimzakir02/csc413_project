@@ -6,8 +6,13 @@ import torchvision.transforms as transforms
 
 from copy import deepcopy
 import math
+import os
+import sys
+
+sys.path.append(os.path.abspath("."))
 
 from backbone import LeNet
+from utils.data import load_data
 
 
 class SSL_BYOL(nn.Module):
@@ -52,7 +57,7 @@ class SSL_BYOL(nn.Module):
         self.device = device
 
         self.online_augmentation = transforms.Compose([
-            transforms.RandomApply(transforms.CenterCrop((28, 28)), p=0.7),
+            transforms.RandomApply([transforms.CenterCrop((28, 28))], p=0.7),
 
             transforms.RandomHorizontalFlip(),
 
@@ -67,7 +72,7 @@ class SSL_BYOL(nn.Module):
         
         self.target_augmentation = transforms.Compose([
 
-            transforms.RandomApply(transforms.CenterCrop((28, 28)), p=0.3),
+            transforms.RandomApply([transforms.CenterCrop((28, 28))], p=0.3),
             transforms.RandomHorizontalFlip(),
 
             transforms.RandomApply(
@@ -142,7 +147,7 @@ class SSL_BYOL(nn.Module):
         count = 0
 
         for batch_X, batch_y in loader:
-            batch_X, batch_y = batch_X.cuda(), batch_y.cuda()
+            batch_X, batch_y = batch_X.to(self.device), batch_y.to(self.device)
             with torch.no_grad():
                 loss += self.forward(batch_X)
             count += len(batch_X)
@@ -150,6 +155,20 @@ class SSL_BYOL(nn.Module):
         return loss / count
 
 
+def train_byol():
+    
+    data = load_data()
+    
+    train_data = torch.utils.data.ConcatDataset([data["id_train_seen"],
+                                                 data["ood_train_seen"]])
+
+    train_loader = torch.utils.data.DataLoader(train_data, batch_size=64, shuffle=True)
+    val_loader = torch.utils.data.DataLoader(data["id_val_seen"])
+
+    ssl_byol = SSL_BYOL(num_classes=5)
+
+    ssl_byol.fit(train_loader, val_loader, epochs=5, print_every=1)
+
+
 if __name__=="__main__":
-    ssl = SSL_BYOL(10)
-    print(ssl)
+    train_byol()
