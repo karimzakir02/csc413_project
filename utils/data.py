@@ -209,8 +209,8 @@ def load_data(seen_digits=tuple(range(5))):
         "ood_test_unseen": Out-Of-Distribution Test Set   (with Unseen Digits)
     """
     # Download data
-    train_set = torchvision.datasets.MNIST('../data/mnist/', train=True, download=True)
-    test_set = torchvision.datasets.MNIST('../data/mnist/', train=False, download=True)
+    train_set = torchvision.datasets.MNIST('./data/mnist/', train=True, download=True)
+    test_set = torchvision.datasets.MNIST('./data/mnist/', train=False, download=True)
 
     # Split training and test set into seen and unseen digits
     (X_train_seen, Y_train_seen), (X_train_unseen, Y_train_unseen) = split_seen_and_unseen_digits(
