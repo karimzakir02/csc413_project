@@ -59,10 +59,8 @@ def load_embeds(model_name):
     assert os.path.exists(embed_path), "OOD unseen digits embeddings don't exist!"
 
     # Load embeddings
-    with open(embed_path, "r") as f:
-        data = np.load(f)
+    with np.load(embed_path) as data:
         embeds = data["embeds"]
-        data.close()
 
     return embeds
 
@@ -90,15 +88,13 @@ def plot_2d(embeds, labels, save_dir=None):
     sns.set_theme(style='white', context='paper', rc={'figure.figsize':(14,10)})
 
     # Create a scatter plot
-    plt.scatter(embeddings_2d[:, 0], embeddings_2d[:, 1], c=labels, cmap='Spectral', s=50)
+    sns.scatterplot(x=embeddings_2d[:, 0], y=embeddings_2d[:, 1], hue=labels, palette='colorblind', s=50, alpha=0.7)
 
     # Remove the axis
     plt.gca().set_axis_off()
 
-    # Add a colorbar
-    cbar = plt.colorbar(boundaries=np.arange(len(np.unique(labels))+1)-0.5)
-    cbar.set_ticks(np.arange(len(np.unique(labels))))
-    cbar.set_ticklabels(np.unique(labels))
+    # Fix legends
+    plt.legend(title='Unseen Digits', fontsize='medium', title_fontsize='x-large')
 
     # Add a title with a larger font size
     plt.title("2D UMAP Embeddings", fontsize=24)
@@ -154,19 +150,26 @@ def compute_cluster_metrics(embeds, labels, method="kmeans"):
 
     # Compute metrics
     metrics = {
-        "adjusted_rand_score": skmetrics.adjusted_rand_score(labels, preds),
-        "adjusted_mutual_info": skmetrics.adjusted_mutual_info_score(labels, preds),
-        "homogeneity": skmetrics.homogeneity_score(labels, preds),
-        "completeness": skmetrics.completeness_score(labels, preds),
-        "silhouette": skmetrics.silhouette_score(embeds, preds, metric='euclidean'),
+        "adjusted_rand_score": float(skmetrics.adjusted_rand_score(labels, preds)),
+        "adjusted_mutual_info": float(skmetrics.adjusted_mutual_info_score(labels, preds)),
+        "homogeneity": float(skmetrics.homogeneity_score(labels, preds)),
+        "completeness": float(skmetrics.completeness_score(labels, preds)),
+        "silhouette": float(skmetrics.silhouette_score(embeds, preds, metric='euclidean')),
     }
     print(metrics)
+    return metrics
 
 
 def main(model_name, seen_digits=(0, 3, 5, 6, 8, 9)):
     # Load OOD test data (unseen digits)
     ood_test_unseen_dataset = data.load_data(seen_digits, torch.device("cpu"))["ood_test_unseen"]
-    labels = [y for _, y in ood_test_unseen_dataset]
+    labels = [y.item() for _, y in ood_test_unseen_dataset]
+
+    # Map labels to unseen digits
+    # NOTE: Labels were previously encoded
+    unseen_digits = [digit for digit in range(10) if digit not in seen_digits]
+    decode_label = {idx: digit for idx, digit in enumerate(unseen_digits)}
+    decoded_labels = [decode_label[label] for label in labels]
 
     # Load model embeddings
     embeds = load_embeds(model_name)
@@ -177,7 +180,7 @@ def main(model_name, seen_digits=(0, 3, 5, 6, 8, 9)):
         os.makedirs(save_dir)
 
     # 1. Plot 2D UMAP
-    plot_2d(embeds, labels, save_dir)
+    plot_2d(embeds, decoded_labels, save_dir)
 
     # 2. Cluster embeddings
     cluster_metrics = compute_cluster_metrics(embeds, labels, method="kmeans")
