@@ -187,13 +187,13 @@ def disagreement_loss(first_model_logits, second_model_logits, epsilon=1e-6):
 @dataclass
 class HParams:
     num_classes: int = 5
-    num_epochs: int = 4
+    num_epochs: int = 2
     lr: float = 0.005
     momentum: float = 0.9       # NOTE: Only applies if SGD is used
     batch_size: int = 64
     optimizer: str = "adamw"    # one of (sgd, adam, adamw)
 
-    disagreement_alpha: float = 0.1
+    disagreement_alpha: float = 0.5
 
 
 class DisagreementClassifier(torch.nn.Module):
@@ -266,7 +266,7 @@ class DisagreementClassifier(torch.nn.Module):
             id_train_acc = compute_accuracy(self.first_model, id_train_dl)
             id_val_acc = compute_accuracy(self.first_model, id_val_dl)
             ood_train_acc = compute_accuracy(self.first_model, ood_train_dl)
-            print(f"Epoch {epoch} | \tID Train Acc: {id_train_acc:.2f}, OOD Train Acc: {ood_train_acc:.2f}, ID Val Acc: {id_val_acc:.2f}")
+            print(f"Epoch {epoch} |\tID Train Acc: {id_train_acc:.2f}, OOD Train Acc: {ood_train_acc:.2f}, ID Val Acc: {id_val_acc:.2f}")
 
             # Log epoch metrics
             wandb.log({
@@ -279,7 +279,7 @@ class DisagreementClassifier(torch.nn.Module):
 
         # Compute test accuracy
         id_test_acc = compute_accuracy(self.first_model, id_test_dl)
-        print(f"Epoch {epoch} | ID Test Acc: {id_test_acc:.2f}")
+        print(f"Epoch {epoch} |\tID Test Acc: {id_test_acc:.2f}")
 
         # Log metrics
         wandb.log({
@@ -354,7 +354,7 @@ class DisagreementClassifier(torch.nn.Module):
                 # 3. Combine losses
                 loss = erm_loss + (self.hparams.disagreement_alpha * disagreement_loss)
 
-                print(f"Epoch {epoch} Iter {iter_idx} | \tTrain Loss: {loss.item():.4f}, ERM Loss: {erm_loss.item():.4f}, Disagreement Loss: {disagreement_loss.item():.4f}")
+                # print(f"Epoch {epoch} Iter {iter_idx} | \tTrain Loss: {loss.item():.4f}, ERM Loss: {erm_loss.item():.4f}, Disagreement Loss: {disagreement_loss.item():.4f}")
                 # print(f"\t\tMin Entropy: {min_entropy}, Avg Entropy: {avg_entropy}, Max Entropy: {max_entropy}")
 
                 # Perform backprop
@@ -367,7 +367,7 @@ class DisagreementClassifier(torch.nn.Module):
             # ood_train_acc = compute_accuracy_ensemble(models, ood_train_dl)
             id_train_acc = compute_accuracy(self.second_model, id_train_dl)
             id_val_acc = compute_accuracy(self.second_model, id_val_dl)
-            ood_train_acc = compute_accuracy(self.second_model, ood_train_dl)
+            ood_train_acc = compute_accuracy(self.second_model, ood_train_dl) 
             print(f"Epoch {epoch} | \t Train Loss: {loss.item():.2f}, ID Train Acc: {id_train_acc:.2f}, OOD Train Acc: {ood_train_acc:.2f}, ID Val Acc: {id_val_acc:.2f}")
 
             # Log epoch metrics
@@ -511,12 +511,8 @@ if __name__ == "__main__":
     ############################################################################
     #                            OOD Evaluation                                #
     ############################################################################
-    # # Extract features on OOD data
-    # ood_test_unseen_feats = model.extract_disagreement_features(dset_dicts["ood_test_unseen"])
+    # Extract features on OOD data
+    ood_test_unseen_feats = model.extract_disagreement_features(dset_dicts["ood_test_unseen"])
 
-    # # Store features
-    # with open(os.path.join(run_dir, "ood_test_unseen_feats.npz")) as f:
-    #     np.savez(f, ood_test_unseen_feats)
-
-    # TODO: Plot 2D UMAP of features, colored by unseen classes
-    # TODO: Cluster features into number of unseen classes
+    # Store features
+    np.savez(os.path.join(run_dir, "ood_test_unseen_feats.npz"), embeds=ood_test_unseen_feats)
