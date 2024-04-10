@@ -34,7 +34,7 @@ DIR_RESULTS = "results"
 
 # Mapping of model to checkpoint subdirectory
 MODEL_TO_EMBEDS = {
-    "cdc": "cdc/2024-04-10_00-03-35/ood_test_unseen_feats.npz"
+    "cdc": "cdc/2024-04-10_15-32-38/ood_test_unseen_feats.npz"
 }
 
 
@@ -60,7 +60,9 @@ def load_embeds(model_name):
 
     # Load embeddings
     with open(embed_path, "r") as f:
-        embeds = np.load(f)
+        data = np.load(f)
+        embeds = data["embeds"]
+        data.close()
 
     return embeds
 
