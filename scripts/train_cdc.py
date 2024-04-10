@@ -129,7 +129,6 @@ def compute_accuracy_ensemble(models, dataloader):
     return accuracy.item()
 
 
-
 # NOTE: More numerically stable re-implementation of the disagreement loss
 def disagreement_loss(first_model_logits, second_model_logits, epsilon=1e-6):
     """
@@ -188,13 +187,13 @@ def disagreement_loss(first_model_logits, second_model_logits, epsilon=1e-6):
 @dataclass
 class HParams:
     num_classes: int = 5
-    num_epochs: int = 2
+    num_epochs: int = 4
     lr: float = 0.005
-    momentum: float = 0.9
+    momentum: float = 0.9       # NOTE: Only applies if SGD is used
     batch_size: int = 64
     optimizer: str = "adamw"    # one of (sgd, adam, adamw)
 
-    disagreement_alpha: float = 1e-4
+    disagreement_alpha: float = 0.1
 
 
 class DisagreementClassifier(torch.nn.Module):
@@ -262,11 +261,11 @@ class DisagreementClassifier(torch.nn.Module):
                 loss.backward()
                 self.first_opt.step()
 
-                print(f"Epoch {epoch} Iter {iter_idx} | \tTrain Loss: {loss.item():.4f}")
+                # print(f"Epoch {epoch} Iter {iter_idx} | \tTrain Loss: {loss.item():.4f}")
 
             id_train_acc = compute_accuracy(self.first_model, id_train_dl)
             id_val_acc = compute_accuracy(self.first_model, id_val_dl)
-            ood_train_acc = compute_accuracy(self.second_model, ood_train_dl)
+            ood_train_acc = compute_accuracy(self.first_model, ood_train_dl)
             print(f"Epoch {epoch} | \tID Train Acc: {id_train_acc:.2f}, OOD Train Acc: {ood_train_acc:.2f}, ID Val Acc: {id_val_acc:.2f}")
 
             # Log epoch metrics
@@ -340,6 +339,15 @@ class DisagreementClassifier(torch.nn.Module):
                 # 2. Pass OOD data into first model and train second model to disagree
                 with torch.no_grad():
                     first_model_logits = self.first_model(ood_x)
+                    first_probs = torch.softmax(first_model_logits, dim=1)
+                    entropy = -(first_probs * torch.log(first_probs + 1e-7)).sum(dim=1)
+                    min_entropy, avg_entropy, max_entropy = min(entropy), entropy.mean(), max(entropy)
+                    quarter_entropy = np.quantile(entropy, q=0.25)
+
+                    # Filter OOD data for above average entropy
+                    # TODO: Further investigate why selecting OOD data with low entropy is useful
+                    ood_x = ood_x[entropy < quarter_entropy]
+
                 second_model_logits = self.second_model(ood_x)
                 disagreement_loss = self.disagreement_loss(first_model_logits, second_model_logits)
 
@@ -347,15 +355,19 @@ class DisagreementClassifier(torch.nn.Module):
                 loss = erm_loss + (self.hparams.disagreement_alpha * disagreement_loss)
 
                 print(f"Epoch {epoch} Iter {iter_idx} | \tTrain Loss: {loss.item():.4f}, ERM Loss: {erm_loss.item():.4f}, Disagreement Loss: {disagreement_loss.item():.4f}")
+                # print(f"\t\tMin Entropy: {min_entropy}, Avg Entropy: {avg_entropy}, Max Entropy: {max_entropy}")
 
                 # Perform backprop
                 self.second_opt.zero_grad()
                 loss.backward()
                 self.second_opt.step()
 
-            id_train_acc = compute_accuracy_ensemble(models, id_train_dl)
-            id_val_acc = compute_accuracy_ensemble(models, id_val_dl)
-            ood_train_acc = compute_accuracy_ensemble(models, ood_train_dl)
+            # id_train_acc = compute_accuracy_ensemble(models, id_train_dl)
+            # id_val_acc = compute_accuracy_ensemble(models, id_val_dl)
+            # ood_train_acc = compute_accuracy_ensemble(models, ood_train_dl)
+            id_train_acc = compute_accuracy(self.second_model, id_train_dl)
+            id_val_acc = compute_accuracy(self.second_model, id_val_dl)
+            ood_train_acc = compute_accuracy(self.second_model, ood_train_dl)
             print(f"Epoch {epoch} | \t Train Loss: {loss.item():.2f}, ID Train Acc: {id_train_acc:.2f}, OOD Train Acc: {ood_train_acc:.2f}, ID Val Acc: {id_val_acc:.2f}")
 
             # Log epoch metrics
@@ -368,7 +380,8 @@ class DisagreementClassifier(torch.nn.Module):
             })
 
         # Compute test accuracy
-        id_test_acc = compute_accuracy_ensemble(models, id_test_dl)
+        # id_test_acc = compute_accuracy_ensemble(models, id_test_dl)
+        id_test_acc = compute_accuracy(self.second_model, id_test_dl)
         print(f"Epoch {epoch} | ID Test Acc: {id_test_acc:.2f}")
 
         # Revert first model to trainable
@@ -455,11 +468,13 @@ class DisagreementClassifier(torch.nn.Module):
 
 if __name__ == "__main__":
     # Load data
-    seen_digits = tuple(range(5))
+    seen_digits = [0, 3, 5, 6, 8, 9]    # NOTE: Numbers with curves
+    # seen_digits = [1, 2, 4, 7]          # NOTE: Numbers without curves
+    # seen_digits = tuple(range(5))
     dset_dicts = data.load_data(seen_digits)
 
     # Create hyperparameters
-    hparams = HParams()
+    hparams = HParams(num_classes=len(seen_digits))
 
     ############################################################################
     #                             Train Model                                  #
@@ -485,6 +500,7 @@ if __name__ == "__main__":
             id_val_data=dset_dicts["id_val_seen"],
             id_test_data=dset_dicts["id_val_seen"],
             ood_train_data=dset_dicts["ood_train_seen"],
+            save_dir=run_dir,
         )
     except Exception as error_msg:
         # Remove directory
