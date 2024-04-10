@@ -148,6 +148,16 @@ def split_seen_and_unseen_digits(X, Y, seen_digits=tuple(range(5))):
     X_seen, X_unseen = X[mask_seen_digits], X[~mask_seen_digits]
     Y_seen, Y_unseen = Y[mask_seen_digits], Y[~mask_seen_digits]
 
+    # Map old labels to new labels
+    # NOTE: To account for non-contiguous labels
+    relabel_seen = {digit: idx for idx, digit in enumerate(seen_digits)}
+    unseen_digits = [digit for digit in range(10) if digit not in seen_digits]
+    relabel_unseen = {digit: idx for idx, digit in enumerate(unseen_digits)}
+    for old_digit, new_digit in relabel_seen.items():
+        Y_seen[Y_seen == old_digit] = new_digit
+    for old_digit, new_digit in relabel_unseen.items():
+        Y_unseen[Y_unseen == old_digit] = new_digit
+
     assert len(X_seen) == len(Y_seen)
     assert len(X_unseen) == len(Y_unseen)
 
