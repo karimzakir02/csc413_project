@@ -1,3 +1,5 @@
+import numpy as np
+from sklearn.neighbors import KNeighborsClassifier 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -24,17 +26,17 @@ class SSL_BYOL(nn.Module):
         self.encoder.fc3 = nn.Identity()  # don't want predictions, just representation
 
         self.projector = nn.Sequential(
-            nn.Linear(84, 168),
-            nn.BatchNorm1d(168),
+            nn.Linear(84, 128),
+            nn.BatchNorm1d(128),
             nn.ReLU(inplace=True),
-            nn.Linear(168, 32)
+            nn.Linear(128, 32)
         )
 
         self.predictor = nn.Sequential(
-            nn.Linear(32, 168),
-            nn.BatchNorm1d(168),
+            nn.Linear(32, 128),
+            nn.BatchNorm1d(128),
             nn.ReLU(inplace=True),
-            nn.Linear(168, 32)
+            nn.Linear(128, 32)
         )
 
         self.online_network = nn.Sequential(
@@ -95,7 +97,7 @@ class SSL_BYOL(nn.Module):
             
             self.train(train_loader)
 
-            self.tau += 1 - (1 - self.tau_base) * (math.cos(math.pi*(epoch + 1) / epochs) + 1)/2
+            # self.tau += 1 - (1 - self.tau_base) * (math.cos(math.pi*(epoch + 1) / epochs) + 1)/2
 
             train_loss.append(self.validate(train_loader))
             val_loss.append(self.validate(val_loader))
@@ -173,8 +175,52 @@ def train_byol():
 
     ssl_byol = SSL_BYOL(num_classes=5)
 
-    ssl_byol.fit(train_loader, val_loader, epochs=5, print_every=1)
+    ssl_byol.fit(train_loader, val_loader, epochs=20, print_every=5)
+
+
+def forward_dataset(encoder, dataset):
+
+    embeddings = None
+    labels = []
+
+    for X, y in dataset:
+        embedding = encoder(X[None])
+
+        labels.append(y)
+
+        if embeddings is None:
+            embeddings = embedding
+        else:
+            embeddings = torch.concat((embeddings, embedding), dim=0)
+
+    return embeddings, labels
+
+
+def predict(embeddings, labels):
+    knn = KNeighborsClassifier()
+    knn.fit(embeddings.detach().numpy(), labels)
+
+    preds = knn.predict(embeddings.detach().numpy())
+
+    return preds
+
+
+def test_byol():
+    data = load_data()
+    id_test = data["id_test_seen"]
+    ood_test = data["ood_test_unseen"]
+
+    encoder = LeNet()
+    encoder.fc3 = nn.Identity()
+    encoder_path = os.path.join("checkpoints", "ssl_byol_encoder", "checkpoint_10.pt")
+    encoder.load_state_dict(torch.load(encoder_path))
+
+    id_embeddings, id_labels = forward_dataset(encoder, id_test)
+    id_predictions = predict(id_embeddings, id_labels)
+
+    ood_embeddings, ood_labels = forward_dataset(encoder, ood_test)
+    ood_predictions = predict(ood_embeddings, ood_labels)
 
 
 if __name__=="__main__":
-    train_byol()
+    test_byol()
