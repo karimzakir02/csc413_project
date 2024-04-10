@@ -188,14 +188,14 @@ def shuffle_data(X, Y):
     return X, Y
 
 
-def send_to_device(X, Y):
+def send_to_device(X, Y, device=DEVICE):
     """
     Prepare data to send to device.
     """
-    return (X.to(DEVICE).float(), Y.to(DEVICE))
+    return (X.to(device).float(), Y.to(device))
 
 
-def load_data(seen_digits=tuple(range(5))):
+def load_data(seen_digits=tuple(range(5)), device=DEVICE):
     """
     Load MNIST data.
 
@@ -208,6 +208,8 @@ def load_data(seen_digits=tuple(range(5))):
     seen_digits : tuple, optional
         Digits seen during training and used by OOD data, by default 0 to 4.
         Other digits are considered "unseen" and used in testing.
+    device : torch.device, optional
+        Device to send data to, by default DEVICE
 
     Returns
     -------
@@ -268,11 +270,11 @@ def load_data(seen_digits=tuple(range(5))):
     X_ood_test_unseen = color_digits_randomly(X_ood_test_unseen, Y_ood_test_unseen)
 
     # Send to device
-    X_id_train_seen, Y_id_train_seen = send_to_device(X_id_train_seen, Y_id_train_seen)
-    X_id_val_seen, Y_id_val_seen = send_to_device(X_id_val_seen, Y_id_val_seen)
-    X_test_seen, Y_test_seen = send_to_device(X_test_seen, Y_test_seen)
-    X_ood_train_seen, Y_ood_train_seen = send_to_device(X_ood_train_seen, Y_ood_train_seen)
-    X_ood_test_unseen, Y_ood_test_unseen = send_to_device(X_ood_test_unseen, Y_ood_test_unseen)
+    X_id_train_seen, Y_id_train_seen = send_to_device(X_id_train_seen, Y_id_train_seen, device)
+    X_id_val_seen, Y_id_val_seen = send_to_device(X_id_val_seen, Y_id_val_seen, device)
+    X_test_seen, Y_test_seen = send_to_device(X_test_seen, Y_test_seen, device)
+    X_ood_train_seen, Y_ood_train_seen = send_to_device(X_ood_train_seen, Y_ood_train_seen, device)
+    X_ood_test_unseen, Y_ood_test_unseen = send_to_device(X_ood_test_unseen, Y_ood_test_unseen, device)
 
     # Convert into Dataset objects
     id_train_seen_dataset = torch.utils.data.TensorDataset(X_id_train_seen, Y_id_train_seen)
