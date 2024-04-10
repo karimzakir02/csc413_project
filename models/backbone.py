@@ -13,11 +13,16 @@ class LeNet(nn.Module):
         self.fc3 = nn.Linear(84, num_classes)
         self.maxPool = nn.MaxPool2d(2,2)
 
-    def forward(self, x):
+    def extract_features(self, x):
         x = self.maxPool(F.relu(self.conv1(x)))
         x = self.maxPool(F.relu(self.conv2(x)))
         x = torch.flatten(x, start_dim=1)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
+        return x
+
+    def forward(self, x):
+        x = self.extract_features(x)
         x = self.fc3(x)
         return x
+
