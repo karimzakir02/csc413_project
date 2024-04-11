@@ -486,7 +486,7 @@ def train():
     hparams = HParams(**hparams_dict)
 
     # Load data
-    dset_dicts = data.load_data(wandb.config.get(seen_digits, hparams.seen_digits))
+    dset_dicts = data.load_data(wandb.config.get("seen_digits", hparams.seen_digits))
 
     # Create directory for current run
     run_dir = os.path.join("checkpoints", "cdc", wandb.run.id)
