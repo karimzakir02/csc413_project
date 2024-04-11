@@ -179,7 +179,7 @@ def train_byol():
 
 
 def forward_dataset(encoder, dataset):
-
+    encoder.eval()
     embeddings = None
     labels = []
 
@@ -193,16 +193,8 @@ def forward_dataset(encoder, dataset):
         else:
             embeddings = torch.concat((embeddings, embedding), dim=0)
 
+    encoder.train()
     return embeddings, labels
-
-
-def predict(embeddings, labels):
-    knn = KNeighborsClassifier()
-    knn.fit(embeddings.detach().numpy(), labels)
-
-    preds = knn.predict(embeddings.detach().numpy())
-
-    return preds
 
 
 def test_byol():
@@ -214,12 +206,6 @@ def test_byol():
     encoder.fc3 = nn.Identity()
     encoder_path = os.path.join("checkpoints", "ssl_byol_encoder", "checkpoint_10.pt")
     encoder.load_state_dict(torch.load(encoder_path))
-
-    id_embeddings, id_labels = forward_dataset(encoder, id_test)
-    id_predictions = predict(id_embeddings, id_labels)
-
-    ood_embeddings, ood_labels = forward_dataset(encoder, ood_test)
-    ood_predictions = predict(ood_embeddings, ood_labels)
 
 
 if __name__=="__main__":
