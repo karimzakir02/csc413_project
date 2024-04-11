@@ -212,7 +212,7 @@ def test_byol():
     ood_embeddings = ood_embeddings.detach().numpy()
     print(ood_embeddings.shape)
     save_path = os.path.join("checkpoints", "ssl_byol_encoder", "ood_test_unseen_feats.npz")
-    np.save(save_path, ood_embeddings)
+    np.savez(save_path, embeds=ood_embeddings)
 
 
 if __name__=="__main__":
