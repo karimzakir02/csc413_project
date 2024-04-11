@@ -207,6 +207,13 @@ def test_byol():
     encoder_path = os.path.join("checkpoints", "ssl_byol_encoder", "checkpoint_10.pt")
     encoder.load_state_dict(torch.load(encoder_path))
 
+    ood_embeddings, _ = forward_dataset(encoder, ood_test)
+
+    ood_embeddings = ood_embeddings.detach().numpy()
+    print(ood_embeddings.shape)
+    save_path = os.path.join("checkpoints", "ssl_byol_encoder", "ood_test_unseen_feats.npz")
+    np.save(save_path, ood_embeddings)
+
 
 if __name__=="__main__":
     test_byol()
