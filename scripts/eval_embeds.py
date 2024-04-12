@@ -10,6 +10,7 @@ import json
 import os
 
 # Non-standard libraries
+import faiss
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
@@ -18,7 +19,6 @@ import umap
 from scipy import stats
 from sklearn import metrics as skmetrics
 from sklearn.cluster import KMeans
-from sklearn.neighbors import NearestNeighbors
 
 import sys
 
@@ -187,37 +187,57 @@ def compute_knn_accuracies(embeds, labels, k_s=(1, 3, 5, 7)):
         (N, D) array of high-dimensional embeddings
     labels : list
         Labels for each of the N samples
-    k_s : list
-        Number of neighbors to do k-NN, by default 5
+    k_s : int
+        Number of neighbors to do k-NN, by default (1, 3, 5, 7)
 
     Returns
     -------
     dict
         k-NN accuracy for various k's provided
     """
+    print("Peforming kNN...")
     N = len(labels)
+    knn_metrics = {}
+
+    # Build index (on GPU)
+    index = faiss.IndexFlatL2(embeds.shape[1])
+    # Send to GPU, if possible
+    if torch.cuda.is_available():
+        print("Moving kNN index to GPU...")
+        resource = faiss.StandardGpuResources()
+        index = faiss.index_cpu_to_gpu(resource, 0, index)
 
     # Fit nearest neighbors model
-    nn = NearestNeighbors()
-    nn.fit(embeds)
+    index.add(embeds)
 
-    # Perform k-NN for each k
-    knn_metrics = {}
+    # Find greatest k+1 closest neighbors for each point
+    max_k = max(k_s)
+    _, neighbors = index.search(embeds, k=max_k+1)
+
+    # Remove the first dimension, since closest neighbor will be the same point
+    neighbors = neighbors[:, 1:]
+
+    # Broadcast 1d labels array (to be indexable)
+    labels_2d = np.broadcast_to(labels, (N, N))
+
+    # For each of k, compute the accuracy of k neighbors
     for k in k_s:
-        # Find k+1 closest neighbors for each point
-        neighbors = nn.kneighbors(embeds, n_neighbors=k+1, return_distance=False)
+        print(f"Peforming {k}-NN...")
+        # Get the majority label among the first k neighbors
+        curr_neighbors = neighbors[:, :k]
 
-        # Remove the first dimension, since closest neighbor will be the same point
-        neighbors = neighbors[:, 1:]
+        # Create boolean mask for label indices
+        mask = np.zeros((N, N), dtype=bool)
+        np.put_along_axis(mask, curr_neighbors, values=True, axis=1)
 
-        # Get the majority label among neighbors
-        labels_2d = np.broadcast_to(labels, (N, N))
-        neighbor_labels = labels_2d[neighbors]
-        preds, _ = stats.mode(neighbor_labels, axis=1)
+        # Get majority label among neighbors
+        curr_neighbor_labels = labels_2d[mask].reshape(N, k)
+        preds, _ = stats.mode(curr_neighbor_labels, axis=1)
 
         # Compute accuracy
         knn_metrics[f"{k}-nn_accuracy"] = round((preds == labels).mean(), 4)
 
+    print("Peforming k-NN...Done")
     return knn_metrics
 
 
@@ -241,7 +261,7 @@ def main(model_name, seen_digits=(0, 3, 5, 6, 8, 9)):
         os.makedirs(save_dir)
 
     # 1. Plot 2D UMAP
-    plot_2d(embeds, decoded_labels, save_dir)
+    # plot_2d(embeds, decoded_labels, save_dir)
 
     # 2. Perform k-NN on embeddings
     metrics = {}
