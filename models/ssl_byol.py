@@ -198,7 +198,7 @@ def forward_dataset(encoder, dataset):
 
 
 def test_byol():
-    data = load_data()
+    data = load_data(seen_digits=(0, 3, 5, 6, 8, 9))
     id_test = data["id_test_seen"]
     ood_test = data["ood_test_unseen"]
 
@@ -212,7 +212,7 @@ def test_byol():
     ood_embeddings = ood_embeddings.detach().numpy()
     print(ood_embeddings.shape)
     save_path = os.path.join("checkpoints", "ssl_byol_encoder", "ood_test_unseen_feats.npz")
-    np.save(save_path, ood_embeddings)
+    np.savez(save_path, embeds=ood_embeddings)
 
 
 if __name__=="__main__":
