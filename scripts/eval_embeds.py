@@ -18,6 +18,10 @@ import seaborn as sns
 import torch
 import umap
 
+import sys
+
+sys.path.append(os.path.abspath("."))
+
 # Custom libraries
 from utils import data
 
