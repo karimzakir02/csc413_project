@@ -189,7 +189,7 @@ def disagreement_loss(first_model_logits, second_model_logits, epsilon=1e-6):
 @dataclass
 class HParams:
     seen_digits: tuple = (0, 3, 5, 6, 8, 9) # NOTE: Numbers with curves
-    num_classes: int = 5
+    num_classes: int = 6
     num_epochs: int = 2
     lr: float = 0.005
     momentum: float = 0.9       # NOTE: Only applies if SGD is used
