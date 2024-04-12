@@ -2,3 +2,7 @@ data
 wandb
 *.pyc
 *.pth
+*.json
+*.npz
+*.err
+*.out
