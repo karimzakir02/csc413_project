@@ -5,11 +5,13 @@ Description: Code to train disagreement-based classifier on MNIST
 """
 
 # Standard libraries
+import json
 import os
 from dataclasses import dataclass
 from datetime import datetime
 
 # Non-standard libraries
+import click
 import numpy as np
 import wandb
 import torch
@@ -186,7 +188,8 @@ def disagreement_loss(first_model_logits, second_model_logits, epsilon=1e-6):
 ################################################################################
 @dataclass
 class HParams:
-    num_classes: int = 5
+    seen_digits: tuple = (0, 3, 5, 6, 8, 9) # NOTE: Numbers with curves
+    num_classes: int = 6
     num_epochs: int = 2
     lr: float = 0.005
     momentum: float = 0.9       # NOTE: Only applies if SGD is used
@@ -194,6 +197,8 @@ class HParams:
     optimizer: str = "adamw"    # one of (sgd, adam, adamw)
 
     disagreement_alpha: float = 0.5
+    # Used to filter OOD data based on entropy in first model predictions
+    entropy_q: float = 1.0    # 0.25 = bottom 25 entropy
 
 
 class DisagreementClassifier(torch.nn.Module):
@@ -339,14 +344,12 @@ class DisagreementClassifier(torch.nn.Module):
                 # 2. Pass OOD data into first model and train second model to disagree
                 with torch.no_grad():
                     first_model_logits = self.first_model(ood_x)
-                    first_probs = torch.softmax(first_model_logits, dim=1)
+                    first_probs = torch.softmax(first_model_logits, dim=1).cpu()
                     entropy = -(first_probs * torch.log(first_probs + 1e-7)).sum(dim=1)
-                    min_entropy, avg_entropy, max_entropy = min(entropy), entropy.mean(), max(entropy)
-                    quarter_entropy = np.quantile(entropy, q=0.25)
+                    target_entropy = np.quantile(entropy, q=self.hparams.entropy_q)
 
                     # Filter OOD data for above average entropy
-                    # TODO: Further investigate why selecting OOD data with low entropy is useful
-                    ood_x = ood_x[entropy < quarter_entropy]
+                    ood_x = ood_x[entropy < target_entropy]
 
                 second_model_logits = self.second_model(ood_x)
                 disagreement_loss = self.disagreement_loss(first_model_logits, second_model_logits)
@@ -398,7 +401,7 @@ class DisagreementClassifier(torch.nn.Module):
         })
 
 
-    def train(self, id_train_data, id_val_data, id_test_data, ood_train_data, save_dir=None):
+    def fit(self, id_train_data, id_val_data, id_test_data, ood_train_data, save_dir=None):
         """
         Train first and second model.
 
@@ -466,53 +469,192 @@ class DisagreementClassifier(torch.nn.Module):
         return accum_feats
 
 
-if __name__ == "__main__":
+@click.group()
+def cli():
+    pass
+
+
+@cli.command()
+def train():
+    """
+    Train disagreement model.
+    """
+    # CASE 1: Part of a parameter sweep
+    if "WANDB_SWEEP_ID" in os.environ:
+        # Get hyperparameters from config
+        hparams_dict = {k: wandb.config.get(k, default) for k, default in vars(HParams()).items()}
+        hparams = HParams(**hparams_dict)
+        wandb.init()
+    # CASE 2: Not part of a sweep
+    else:
+        # Use default hyperparameters
+        hparams = HParams()
+        wandb.init(project="csc413", config=vars(hparams))
+
     # Load data
-    seen_digits = [0, 3, 5, 6, 8, 9]    # NOTE: Numbers with curves
-    # seen_digits = [1, 2, 4, 7]          # NOTE: Numbers without curves
-    # seen_digits = tuple(range(5))
-    dset_dicts = data.load_data(seen_digits)
-
-    # Create hyperparameters
-    hparams = HParams(num_classes=len(seen_digits))
-
-    ############################################################################
-    #                             Train Model                                  #
-    ############################################################################
-    # Track configuration and metrics for current training run
-    config = {"seen_digits": seen_digits}
-    config.update(vars(hparams))
-    wandb.init(
-        project="csc413",
-        config=config
-    )
+    dset_dicts = data.load_data(wandb.config.get("seen_digits", hparams.seen_digits))
 
     # Create directory for current run
-    run_dir = os.path.join("checkpoints", "cdc", CURR_DATETIME_STR)
+    run_dir = os.path.join("checkpoints", "cdc", wandb.run.id)
     os.makedirs(run_dir)
 
     try:
         # Train disagreement-based classifier
         model = DisagreementClassifier(hparams)
         model = model.to(DEVICE)
-        model.train(
+        model.fit(
             id_train_data=dset_dicts["id_train_seen"],
             id_val_data=dset_dicts["id_val_seen"],
             id_test_data=dset_dicts["id_val_seen"],
             ood_train_data=dset_dicts["ood_train_seen"],
             save_dir=run_dir,
         )
+
+        # Save hyperparameters in the run directory
+        with open(os.path.join(run_dir, "hparams.json"), "w") as f:
+            json.dump(hparams_dict, f, indent=4)
+
     except Exception as error_msg:
         # Remove directory
         os.rmdir(run_dir)
 
         raise error_msg
 
-    ############################################################################
-    #                            OOD Evaluation                                #
-    ############################################################################
+
+@cli.command()
+def perform_sweep():
+    """
+    Perform hyperparameter sweep
+    """
+    # Load data
+    seen_digits = [0, 3, 5, 6, 8, 9]    # NOTE: Numbers with curves
+    # seen_digits = [1, 2, 4, 7]          # NOTE: Numbers without curves
+    # seen_digits = tuple(range(5))
+
+    # Parameter sweep configuration
+    sweep_configuration = {
+        "name": "cdc_sweep",
+        "method": "bayes",
+        "metric": {"goal": "maximize", "name": "ood_train_acc"},
+        "parameters": {
+            "seen_digits": {"value": seen_digits},
+            "num_classes": {"value": len(seen_digits)},
+            "num_epochs": {"values": [5]},
+            "lr": {"min": 0.0001, "max": 0.1},
+            "momentum": {"min": 0.9, "max": 1.-1e-5},
+            "batch_size": {"values": [128, 256]},
+            "optimizer": {"values": ["adamw", "sgd"]},
+
+            "disagreement_alpha": {"min": 0.0001, "max": 1.},
+            "entropy_q": {"values": [1.]}
+        },
+    }
+
+    # Configure sweep
+    sweep_id = wandb.sweep(sweep=sweep_configuration, project="cdc_sweep_w_entropy")
+
+    # Perform parameter sweep
+    wandb.agent(sweep_id, function=train, count=20)
+
+
+def load_hparams(run_dir):
+    """
+    Load hyperparameters from the run directory
+
+    Parameters
+    ----------
+    run_dir : str
+        Path to the run directory
+
+    Returns
+    -------
+    HParams
+        Contains hyperparameters
+    """
+    # Check if JSON file exists
+    hparams_path = os.path.join(run_dir, "hparams.json")
+    if not os.path.exists(hparams_path):
+        raise RuntimeError(f"Hyperparameters file doesn't exist! at `{hparams_path}`")
+
+    with open(hparams_path, "r") as f:
+        hparams_dict = json.load(f)
+    hparams = HParams(**hparams_dict)
+
+    return hparams
+
+
+def load_cdc_model(run_dir):
+    """
+    Load CDC model from its run directory
+
+    Parameters
+    ----------
+    run_dir : str
+        Name of run directory
+
+    Returns
+    -------
+    DisagreementClassifier
+        Trained model
+    """
+    # Check that paths exist
+    weights_path = os.path.join(run_dir, "cdc_weights.pth")
+    hparams_path = os.path.join(run_dir, "hparams.json")
+    if not os.path.exists(run_dir):
+        raise RuntimeError(f"Run directory doesn't exist! at `{run_dir}`")
+    if not os.path.exists(weights_path):
+        raise RuntimeError(f"Weights file doesn't exist! at `{weights_path}`")
+
+    # Load hyperparameters
+    with open(hparams_path, "r") as f:
+        hparams_dict = json.load(f)
+    hparams = HParams(**hparams_dict)
+
+    # Instantiate model
+    model = DisagreementClassifier(hparams)
+
+    # Load model weights
+    model.load_state_dict(torch.load(weights_path, map_location=DEVICE))
+
+    # Send to device
+    model.to(DEVICE)
+
+    # Set to eval state
+    model.eval()
+
+    return model
+
+
+@cli.command()
+@click.option("--run_dir", type=str, help="Name of CDC run sub-directory")
+def extract(run_dir):
+    """
+    Extract features from OOD test set.
+
+    Parameters
+    ----------
+    run_dir : str
+        Name of run directory
+    """
+    print(f"Extracting features at run directory `{run_dir}`...")
+
+    # Prepend checkpoint directory
+    run_dir = os.path.join("checkpoints", "cdc", run_dir)
+
+    # Load model
+    model = load_cdc_model(run_dir)
+
+    # Load hyperparameters
+    hparams = load_hparams(run_dir)
+    # Load datasets
+    dset_dicts = data.load_data(hparams.seen_digits)
+
     # Extract features on OOD data
     ood_test_unseen_feats = model.extract_disagreement_features(dset_dicts["ood_test_unseen"])
 
     # Store features
     np.savez(os.path.join(run_dir, "ood_test_unseen_feats.npz"), embeds=ood_test_unseen_feats)
+
+
+if __name__ == "__main__":
+    cli()
