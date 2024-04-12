@@ -5,18 +5,20 @@ Description: Code to train disagreement-based classifier on MNIST
 """
 
 # Standard libraries
+import argparse
 import json
 import os
+import shutil
 from dataclasses import dataclass
 from datetime import datetime
 
 # Non-standard libraries
-import click
 import numpy as np
 import wandb
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
+from zero_init import ZerO_Init
 
 # Custom libraries
 from models.backbone import LeNet
@@ -199,6 +201,7 @@ class HParams:
     disagreement_alpha: float = 0.5
     # Used to filter OOD data based on entropy in first model predictions
     entropy_q: float = 1.0    # 0.25 = bottom 25 entropy
+    init: str = "ZerO"        # "ZerO" or PyTorch default
 
 
 class DisagreementClassifier(torch.nn.Module):
@@ -255,6 +258,12 @@ class DisagreementClassifier(torch.nn.Module):
 ################################################################################
 #                              (Vanilla) Model 1                               #
 ################################################################################""")
+        self.first_model.train()
+
+        # Initialize weights with zero initialization
+        if self.hparams.init == "ZerO":
+            print("Initializing (first) CDC model with ZerO initialization!")
+            self.first_model.apply(ZerO_Init)
 
         # Train model
         for epoch in range(1, self.hparams.num_epochs+1):
@@ -266,7 +275,10 @@ class DisagreementClassifier(torch.nn.Module):
                 loss.backward()
                 self.first_opt.step()
 
-                # print(f"Epoch {epoch} Iter {iter_idx} | \tTrain Loss: {loss.item():.4f}")
+                # TODO: Remove
+                ood_train_acc = compute_accuracy(self.first_model, ood_train_dl)
+
+                print(f"Epoch {epoch} Iter {iter_idx} | \tTrain Loss: {loss.item():.4f}, OOD Train Acc: {ood_train_acc:.2f}")
 
             id_train_acc = compute_accuracy(self.first_model, id_train_dl)
             id_val_acc = compute_accuracy(self.first_model, id_val_dl)
@@ -296,6 +308,8 @@ class DisagreementClassifier(torch.nn.Module):
             "ood_train_acc": ood_train_acc,
         })
 
+        self.first_model.eval()
+
 
     def train_second_model(self, id_train_dl, id_val_dl, id_test_dl,
                            ood_train_dl):
@@ -323,6 +337,7 @@ class DisagreementClassifier(torch.nn.Module):
 
         # Ensure first model isn't being trained
         self.first_model.eval()
+        self.second_model.train()
 
         # Create sampler from OOD data
         ood_sampler = dataloader_to_sampler(ood_train_dl)
@@ -331,6 +346,11 @@ class DisagreementClassifier(torch.nn.Module):
 ################################################################################
 #                            (Disagreement) Model 2                            #
 ################################################################################""")
+
+        # Initialize weights with zero initialization
+        if self.hparams.init == "ZerO":
+            print("Initializing (second) CDC model with ZerO initialization!")
+            self.second_model.apply(ZerO_Init)
 
         # Train model
         for epoch in range(1, self.hparams.num_epochs+1):
@@ -389,6 +409,7 @@ class DisagreementClassifier(torch.nn.Module):
 
         # Revert first model to trainable
         self.first_model.train()
+        self.second_model.eval()
 
         # Log metrics
         wandb.log({
@@ -469,26 +490,21 @@ class DisagreementClassifier(torch.nn.Module):
         return accum_feats
 
 
-@click.group()
-def cli():
-    pass
-
-
-@cli.command()
 def train():
     """
     Train disagreement model.
     """
     # CASE 1: Part of a parameter sweep
     if "WANDB_SWEEP_ID" in os.environ:
+        wandb.init()
         # Get hyperparameters from config
         hparams_dict = {k: wandb.config.get(k, default) for k, default in vars(HParams()).items()}
         hparams = HParams(**hparams_dict)
-        wandb.init()
     # CASE 2: Not part of a sweep
     else:
         # Use default hyperparameters
         hparams = HParams()
+        hparams_dict = vars(hparams)
         wandb.init(project="csc413", config=vars(hparams))
 
     # Load data
@@ -516,12 +532,11 @@ def train():
 
     except Exception as error_msg:
         # Remove directory
-        os.rmdir(run_dir)
+        shutil.rmtree(run_dir)
 
         raise error_msg
 
 
-@cli.command()
 def perform_sweep():
     """
     Perform hyperparameter sweep
@@ -546,12 +561,13 @@ def perform_sweep():
             "optimizer": {"values": ["adamw", "sgd"]},
 
             "disagreement_alpha": {"min": 0.0001, "max": 1.},
-            "entropy_q": {"values": [1.]}
+            "entropy_q": {"values": [0.25, 0.5, 0.75, 1.]},
+            "init": {"value": "ZerO"}
         },
     }
 
     # Configure sweep
-    sweep_id = wandb.sweep(sweep=sweep_configuration, project="cdc_sweep_w_entropy")
+    sweep_id = wandb.sweep(sweep=sweep_configuration, project="cdc_sweep_w_entropy_and_zero_init")
 
     # Perform parameter sweep
     wandb.agent(sweep_id, function=train, count=20)
@@ -625,8 +641,6 @@ def load_cdc_model(run_dir):
     return model
 
 
-@cli.command()
-@click.option("--run_dir", type=str, help="Name of CDC run sub-directory")
 def extract(run_dir):
     """
     Extract features from OOD test set.
@@ -657,4 +671,27 @@ def extract(run_dir):
 
 
 if __name__ == "__main__":
-    cli()
+    # 1. Set up argument parser
+    PARSER = argparse.ArgumentParser()
+    PARSER.add_argument(
+        "--action",
+        choices=["train", "perform_sweep", "extract"],
+        required=True,
+    )
+    PARSER.add_argument(
+        "--run_dir",
+        default=None,
+        type=str,
+    )
+
+    # 2. Parse arguments
+    ARGS = PARSER.parse_args()
+
+    # 3. Call function
+    if ARGS.action == "train":
+        train()
+    elif ARGS.action == "perform_sweep":
+        perform_sweep()
+    elif ARGS.action == "extract":
+        assert ARGS.run_dir, "If extracting features, please provide `run_dir`!"
+        extract(ARGS.run_dir)
