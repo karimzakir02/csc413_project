@@ -12,11 +12,13 @@ import os
 # Non-standard libraries
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn import metrics as skmetrics
-from sklearn.cluster import KMeans
 import seaborn as sns
 import torch
 import umap
+from scipy import stats
+from sklearn import metrics as skmetrics
+from sklearn.cluster import KMeans
+from sklearn.neighbors import NearestNeighbors
 
 import sys
 
@@ -38,8 +40,17 @@ DIR_RESULTS = "results"
 
 # Mapping of model to checkpoint subdirectory
 MODEL_TO_EMBEDS = {
+    # 1. Baseline (trained on ID data with seen digits)
+    "id_baseline": os.path.join("baseline", "shvmydmf", "ood_test_unseen_feats.npz"),
+
+    # 2. Baseline (trained on OOD data (cov. shift) with seen digits)
+    "ood_baseline": os.path.join("baseline", "k2pei6di", "ood_test_unseen_feats.npz"),
+
+    # 3. Disagreement Model (trained on ID and OOD data with seen digits)
     # "cdc": "cdc/ul8ytlfx/ood_test_unseen_feats.npz"
-    "cdc": "cdc/5i8no940/ood_test_unseen_feats.npz",
+    "cdc": os.path.join("cdc", "5i8no940", "ood_test_unseen_feats.npz"),
+
+    # 4. Self-Supervised Model (trained on OOD data with seen digits)
     "ssl_byol": os.path.join("ssl_byol_encoder", "ood_test_unseen_feats.npz"),
 }
 
@@ -166,6 +177,50 @@ def compute_cluster_metrics(embeds, labels, method="kmeans"):
     return metrics
 
 
+def compute_knn_accuracies(embeds, labels, k_s=(1, 3, 5, 7)):
+    """
+    Compute kNN accuracy given embeddings.
+
+    Parameters
+    ----------
+    embeds : np.array
+        (N, D) array of high-dimensional embeddings
+    labels : list
+        Labels for each of the N samples
+    k_s : list
+        Number of neighbors to do k-NN, by default 5
+
+    Returns
+    -------
+    dict
+        k-NN accuracy for various k's provided
+    """
+    N = len(labels)
+
+    # Fit nearest neighbors model
+    nn = NearestNeighbors()
+    nn.fit(embeds)
+
+    # Perform k-NN for each k
+    knn_metrics = {}
+    for k in k_s:
+        # Find k+1 closest neighbors for each point
+        neighbors = nn.kneighbors(embeds, n_neighbors=k+1, return_distance=False)
+
+        # Remove the first dimension, since closest neighbor will be the same point
+        neighbors = neighbors[:, 1:]
+
+        # Get the majority label among neighbors
+        labels_2d = np.broadcast_to(labels, (N, N))
+        neighbor_labels = labels_2d[neighbors]
+        preds, _ = stats.mode(neighbor_labels, axis=1)
+
+        # Compute accuracy
+        knn_metrics[f"{k}-nn_accuracy"] = round((preds == labels).mean(), 4)
+
+    return knn_metrics
+
+
 def main(model_name, seen_digits=(0, 3, 5, 6, 8, 9)):
     # Load OOD test data (unseen digits)
     ood_test_unseen_dataset = data.load_data(seen_digits, torch.device("cpu"))["ood_test_unseen"]
@@ -188,11 +243,16 @@ def main(model_name, seen_digits=(0, 3, 5, 6, 8, 9)):
     # 1. Plot 2D UMAP
     plot_2d(embeds, decoded_labels, save_dir)
 
-    # 2. Cluster embeddings
-    cluster_metrics = compute_cluster_metrics(embeds, labels, method="kmeans")
+    # 2. Perform k-NN on embeddings
+    metrics = {}
+    metrics.update(compute_knn_accuracies(embeds, labels))
 
-    with open(os.path.join(save_dir, "cluster_metrics.json"), "w") as f:
-        json.dump(cluster_metrics, f, indent=4)
+    # 3. Cluster embeddings
+    metrics.update(compute_cluster_metrics(embeds, labels, method="kmeans"))
+
+    # Save metrics
+    with open(os.path.join(save_dir, "metrics.json"), "w") as f:
+        json.dump(metrics, f, indent=4)
 
 
 if __name__ == "__main__":
