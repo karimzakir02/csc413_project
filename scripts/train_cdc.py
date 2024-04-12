@@ -97,6 +97,7 @@ def compute_accuracy(model, dataloader):
     model.train()
     return accuracy.item()
 
+
 @torch.no_grad()
 def compute_accuracy_ensemble(models, dataloader):
     """
@@ -592,7 +593,7 @@ def train():
         model.fit(
             id_train_data=dset_dicts["id_train_seen"],
             id_val_data=dset_dicts["id_val_seen"],
-            id_test_data=dset_dicts["id_val_seen"],
+            id_test_data=dset_dicts["id_test_seen"],
             ood_train_data=dset_dicts["ood_train_seen"],
             save_dir=run_dir,
         )
