@@ -198,7 +198,7 @@ def forward_dataset(encoder, dataset):
 
 
 def test_byol():
-    data = load_data()
+    data = load_data(seen_digits=(0, 3, 5, 6, 8, 9))
     id_test = data["id_test_seen"]
     ood_test = data["ood_test_unseen"]
 
