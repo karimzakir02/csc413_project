@@ -188,7 +188,7 @@ def disagreement_loss(first_model_logits, second_model_logits, epsilon=1e-6):
 ################################################################################
 @dataclass
 class HParams:
-    seen_digits: tuple = (0, 3, 5, 6, 8, 9)
+    seen_digits: tuple = (0, 3, 5, 6, 8, 9) # NOTE: Numbers with curves
     num_classes: int = 5
     num_epochs: int = 2
     lr: float = 0.005
@@ -479,11 +479,17 @@ def train():
     """
     Train disagreement model.
     """
-    wandb.init()    #project="csc413"
-
-    # Create hyperparameters
-    hparams_dict = {k: wandb.config.get(k, default) for k, default in vars(HParams()).items()}
-    hparams = HParams(**hparams_dict)
+    # CASE 1: Part of a parameter sweep
+    if "WANDB_SWEEP_ID" in os.environ:
+        # Get hyperparameters from config
+        hparams_dict = {k: wandb.config.get(k, default) for k, default in vars(HParams()).items()}
+        hparams = HParams(**hparams_dict)
+        wandb.init()
+    # CASE 2: Not part of a sweep
+    else:
+        # Use default hyperparameters
+        hparams = HParams()
+        wandb.init(project="csc413", config=vars(hparams))
 
     # Load data
     dset_dicts = data.load_data(wandb.config.get("seen_digits", hparams.seen_digits))
@@ -524,7 +530,6 @@ def perform_sweep():
     seen_digits = [0, 3, 5, 6, 8, 9]    # NOTE: Numbers with curves
     # seen_digits = [1, 2, 4, 7]          # NOTE: Numbers without curves
     # seen_digits = tuple(range(5))
-    dset_dicts = data.load_data(seen_digits)
 
     # Parameter sweep configuration
     sweep_configuration = {
@@ -534,14 +539,14 @@ def perform_sweep():
         "parameters": {
             "seen_digits": {"value": seen_digits},
             "num_classes": {"value": len(seen_digits)},
-            "num_epochs": {"values": [2, 5]},
+            "num_epochs": {"values": [5]},
             "lr": {"min": 0.0001, "max": 0.1},
             "momentum": {"min": 0.9, "max": 1.-1e-5},
-            "batch_size": {"values": [64, 128, 256]},
+            "batch_size": {"values": [128, 256]},
             "optimizer": {"values": ["adamw", "sgd"]},
 
             "disagreement_alpha": {"min": 0.0001, "max": 1.},
-            "entropy_q": {"values": [0.125, 0.25, 0.5, 0.75, 1.]}
+            "entropy_q": {"values": [1.]}
         },
     }
 
