@@ -39,7 +39,7 @@ DIR_RESULTS = "results"
 # Mapping of model to checkpoint subdirectory
 MODEL_TO_EMBEDS = {
     # "cdc": "cdc/ul8ytlfx/ood_test_unseen_feats.npz"
-    "cdc": "cdc/5i8no940/ood_test_unseen_feats.npz"
+    "cdc": "cdc/5i8no940/ood_test_unseen_feats.npz",
     "ssl_byol": os.path.join("ssl_byol_encoder", "ood_test_unseen_feats.npz"),
 }
 
