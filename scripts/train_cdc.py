@@ -185,6 +185,74 @@ def disagreement_loss(first_model_logits, second_model_logits, epsilon=1e-6):
     return disagreement_loss
 
 
+def load_hparams(run_dir):
+    """
+    Load hyperparameters from the run directory
+
+    Parameters
+    ----------
+    run_dir : str
+        Path to the run directory
+
+    Returns
+    -------
+    HParams
+        Contains hyperparameters
+    """
+    # Check if JSON file exists
+    hparams_path = os.path.join(run_dir, "hparams.json")
+    if not os.path.exists(hparams_path):
+        raise RuntimeError(f"Hyperparameters file doesn't exist! at `{hparams_path}`")
+
+    with open(hparams_path, "r") as f:
+        hparams_dict = json.load(f)
+    hparams = HParams(**hparams_dict)
+
+    return hparams
+
+
+def load_cdc_model(run_dir):
+    """
+    Load CDC model from its run directory
+
+    Parameters
+    ----------
+    run_dir : str
+        Name of run directory
+
+    Returns
+    -------
+    DisagreementClassifier
+        Trained model
+    """
+    # Check that paths exist
+    weights_path = os.path.join(run_dir, "cdc_weights.pth")
+    hparams_path = os.path.join(run_dir, "hparams.json")
+    if not os.path.exists(run_dir):
+        raise RuntimeError(f"Run directory doesn't exist! at `{run_dir}`")
+    if not os.path.exists(weights_path):
+        raise RuntimeError(f"Weights file doesn't exist! at `{weights_path}`")
+
+    # Load hyperparameters
+    with open(hparams_path, "r") as f:
+        hparams_dict = json.load(f)
+    hparams = HParams(**hparams_dict)
+
+    # Instantiate model
+    model = DisagreementClassifier(hparams)
+
+    # Load model weights
+    model.load_state_dict(torch.load(weights_path, map_location=DEVICE))
+
+    # Send to device
+    model.to(DEVICE)
+
+    # Set to eval state
+    model.eval()
+
+    return model
+
+
 ################################################################################
 #                                   Classes                                    #
 ################################################################################
@@ -490,6 +558,9 @@ class DisagreementClassifier(torch.nn.Module):
         return accum_feats
 
 
+################################################################################
+#                                Main Functions                                #
+################################################################################
 def train():
     """
     Train disagreement model.
@@ -571,74 +642,6 @@ def perform_sweep():
 
     # Perform parameter sweep
     wandb.agent(sweep_id, function=train, count=20)
-
-
-def load_hparams(run_dir):
-    """
-    Load hyperparameters from the run directory
-
-    Parameters
-    ----------
-    run_dir : str
-        Path to the run directory
-
-    Returns
-    -------
-    HParams
-        Contains hyperparameters
-    """
-    # Check if JSON file exists
-    hparams_path = os.path.join(run_dir, "hparams.json")
-    if not os.path.exists(hparams_path):
-        raise RuntimeError(f"Hyperparameters file doesn't exist! at `{hparams_path}`")
-
-    with open(hparams_path, "r") as f:
-        hparams_dict = json.load(f)
-    hparams = HParams(**hparams_dict)
-
-    return hparams
-
-
-def load_cdc_model(run_dir):
-    """
-    Load CDC model from its run directory
-
-    Parameters
-    ----------
-    run_dir : str
-        Name of run directory
-
-    Returns
-    -------
-    DisagreementClassifier
-        Trained model
-    """
-    # Check that paths exist
-    weights_path = os.path.join(run_dir, "cdc_weights.pth")
-    hparams_path = os.path.join(run_dir, "hparams.json")
-    if not os.path.exists(run_dir):
-        raise RuntimeError(f"Run directory doesn't exist! at `{run_dir}`")
-    if not os.path.exists(weights_path):
-        raise RuntimeError(f"Weights file doesn't exist! at `{weights_path}`")
-
-    # Load hyperparameters
-    with open(hparams_path, "r") as f:
-        hparams_dict = json.load(f)
-    hparams = HParams(**hparams_dict)
-
-    # Instantiate model
-    model = DisagreementClassifier(hparams)
-
-    # Load model weights
-    model.load_state_dict(torch.load(weights_path, map_location=DEVICE))
-
-    # Send to device
-    model.to(DEVICE)
-
-    # Set to eval state
-    model.eval()
-
-    return model
 
 
 def extract(run_dir):
