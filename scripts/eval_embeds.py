@@ -261,7 +261,7 @@ def main(model_name, seen_digits=(0, 3, 5, 6, 8, 9)):
         os.makedirs(save_dir)
 
     # 1. Plot 2D UMAP
-    # plot_2d(embeds, decoded_labels, save_dir)
+    plot_2d(embeds, decoded_labels, save_dir)
 
     # 2. Perform k-NN on embeddings
     metrics = {}
