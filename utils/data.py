@@ -346,7 +346,7 @@ def load_data(seen_digits=tuple(range(5)), device=DEVICE, seed=SEED):
     # Send to device
     X_id_train_seen, Y_id_train_seen = send_to_device(X_id_train_seen, Y_id_train_seen, device)
     X_id_val_seen, Y_id_val_seen = send_to_device(X_id_val_seen, Y_id_val_seen, device)
-    X_test_seen, Y_test_seen = send_to_device(X_test_seen, Y_test_seen, device)
+    X_id_test_seen, Y_id_test_seen = send_to_device(X_id_test_seen, Y_id_test_seen, device)
     X_ood_train_seen, Y_ood_train_seen = send_to_device(X_ood_train_seen, Y_ood_train_seen, device)
     X_ood_val_seen, Y_ood_val_seen = send_to_device(X_ood_val_seen, Y_ood_val_seen, device)
     X_ood_test_seen, Y_ood_test_seen = send_to_device(X_ood_test_seen, Y_ood_test_seen, device)
@@ -355,7 +355,7 @@ def load_data(seen_digits=tuple(range(5)), device=DEVICE, seed=SEED):
     # Convert into Dataset objects
     id_train_seen_dataset = torch.utils.data.TensorDataset(X_id_train_seen, Y_id_train_seen)
     id_val_seen_dataset = torch.utils.data.TensorDataset(X_id_val_seen, Y_id_val_seen)
-    id_test_seen_dataset = torch.utils.data.TensorDataset(X_test_seen, Y_test_seen)
+    id_test_seen_dataset = torch.utils.data.TensorDataset(X_id_test_seen, Y_id_test_seen)
     ood_train_seen_dataset = torch.utils.data.TensorDataset(X_ood_train_seen, Y_ood_train_seen)
     ood_val_seen_dataset = torch.utils.data.TensorDataset(X_ood_val_seen, Y_ood_val_seen)
     ood_test_seen_dataset = torch.utils.data.TensorDataset(X_ood_test_seen, Y_ood_test_seen)
