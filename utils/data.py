@@ -383,3 +383,17 @@ def load_data(seen_digits=tuple(range(5)), device=DEVICE, seed=SEED):
     print(f"Size of OOD Test Set        (Unseen Digits): {len(ood_test_unseen_dataset)}")
 
     return datasets
+
+
+if __name__ == "__main__":
+    # Verify seed setting
+    data_0 = load_data(seed=0)
+    data_1 = load_data(seed=0)
+
+    # Check labels match up for training set
+    train_dataset_0 = data_0["id_train_seen"]
+    train_dataset_1 = data_1["id_train_seen"]
+
+    assert len(train_dataset_0) == len(train_dataset_1)
+    for i in range(len(train_dataset_0)):
+        assert train_dataset_0[i][1] == train_dataset_1[i][1], f"Labels don't match for index {i}"
