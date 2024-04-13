@@ -552,7 +552,7 @@ class DisagreementClassifier(torch.nn.Module):
         # Extract features for all data in the adtaset
         accum_feats = []
         for X, _ in dataloader:
-            accum_feats.append(self.second_model.extract_features(X))
+            accum_feats.append(self.second_model.extract_features(X).cpu())
         accum_feats = torch.cat(accum_feats).numpy()
 
         self.second_model.train()

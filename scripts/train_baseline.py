@@ -300,7 +300,7 @@ class BaselineClassifier(torch.nn.Module):
         # Extract features for all data in the adtaset
         accum_feats = []
         for X, _ in dataloader:
-            accum_feats.append(self.model.extract_features(X))
+            accum_feats.append(self.model.extract_features(X).cpu())
         accum_feats = torch.cat(accum_feats).numpy()
 
         self.model.train()
@@ -384,7 +384,7 @@ if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()
     PARSER.add_argument(
         "--action",
-        choices=["train", "perform_sweep", "extract"],
+        choices=["train", "extract"],
         required=True,
     )
     PARSER.add_argument(
