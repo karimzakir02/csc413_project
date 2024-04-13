@@ -39,26 +39,27 @@ DIR_CKPT = "checkpoints"
 DIR_RESULTS = "results"
 
 # Mapping of model to checkpoint subdirectory
-MODEL_TO_EMBEDS = {
+MODEL_TO_SUBDIR = {
+    # 0. Random Baseline
+
     # 1. Baseline (trained on ID data with seen digits)
-    "id_baseline": os.path.join("baseline", "shvmydmf", "ood_test_unseen_feats.npz"),
+    # "id_baseline": os.path.join("baseline", "sqyfixna"),
 
     # 2. Baseline (trained on OOD data (cov. shift) with seen digits)
-    "ood_baseline": os.path.join("baseline", "k2pei6di", "ood_test_unseen_feats.npz"),
+    # "ood_baseline": os.path.join("baseline", "99yc6d4l"),
 
-    # 3. Disagreement Model (trained on ID and OOD data with seen digits)
-    # "cdc": "cdc/ul8ytlfx/ood_test_unseen_feats.npz"
-    "cdc": os.path.join("cdc", "5i8no940", "ood_test_unseen_feats.npz"),
+    # 3. Disagreement Model (trained on ID and unlabeled OOD data with seen digits)
+    # "cdc": os.path.join("cdc", "d01h0u3o"),
 
     # 4. Self-Supervised Model (trained on OOD data with seen digits)
-    "ssl_byol": os.path.join("ssl_byol_encoder", "ood_test_unseen_feats.npz"),
+    "ssl_byol": os.path.join("ssl_byol_encoder"),
 }
 
 
 ################################################################################
 #                                  Functions                                   #
 ################################################################################
-def load_embeds(model_name):
+def load_embeds(model_name, seen=False):
     """
     Load embeddings given model name
 
@@ -66,13 +67,17 @@ def load_embeds(model_name):
     ----------
     model_name : str
         Name of model
+    seen : bool, optional
+        If True, load embeddings for OOD (seen digits with random colors).
+        Otherwise, load embeddings for OOD (unseen digits with random colors).
 
     Returns
     -------
     np.array
-        Embedding for each sample in the OOD unseen digits set
+        Embedding for each sample in the OOD test set (seen/unseen digits)
     """
-    embed_path = os.path.join(DIR_CKPT, MODEL_TO_EMBEDS[model_name])
+    embed_dir = os.path.join(DIR_CKPT, MODEL_TO_SUBDIR[model_name])
+    embed_path = os.path.join(embed_dir, f"ood_test_{'seen' if seen else 'unseen'}_feats.npz")
     assert os.path.exists(embed_path), "OOD unseen digits embeddings don't exist!"
 
     # Load embeddings
@@ -241,22 +246,40 @@ def compute_knn_accuracies(embeds, labels, k_s=(1, 3, 5, 7)):
     return knn_metrics
 
 
-def main(model_name, seen_digits=(0, 3, 5, 6, 8, 9)):
-    # Load OOD test data (unseen digits)
-    ood_test_unseen_dataset = data.load_data(seen_digits, torch.device("cpu"))["ood_test_unseen"]
-    labels = [y.item() for _, y in ood_test_unseen_dataset]
+def main(model_name, seen_digits=(0, 3, 5, 6, 8, 9), seen=False):
+    """
+    Perform evaluation on OOD test set (seen or unseen digits) with random
+    colors.
 
-    # Map labels to unseen digits
+    Parameters
+    ----------
+    model_name : str
+        Name of model
+    seen_digits : tuple, optional
+        List of digits seen during training, by default (0, 3, 5, 6, 8, 9)
+    seen : bool, optional
+        If True, evaluate OOD test set with seen digits. Otherwise, evaluate
+        OOD test set with unseen digits, by default False
+    """
+    seen_key = "ood_test_seen" if seen else "ood_test_unseen"
+
+    # Load OOD test data (unseen digits)
+    ood_test_dataset = data.load_data(seen_digits, torch.device("cpu"))[seen_key]
+    labels = [y.item() for _, y in ood_test_dataset]
+
+    # Map labels to seen/unseen digits
     # NOTE: Labels were previously encoded
-    unseen_digits = [digit for digit in range(10) if digit not in seen_digits]
-    decode_label = {idx: digit for idx, digit in enumerate(unseen_digits)}
+    test_digits = list(seen_digits)
+    if not seen:
+        test_digits = [digit for digit in range(10) if digit not in seen_digits]
+    decode_label = {idx: digit for idx, digit in enumerate(test_digits)}
     decoded_labels = [decode_label[label] for label in labels]
 
     # Load model embeddings
-    embeds = load_embeds(model_name)
+    embeds = load_embeds(model_name, seen=seen)
 
     # Create directory to save results
-    save_dir = os.path.join(DIR_RESULTS, model_name)
+    save_dir = os.path.join(DIR_RESULTS, model_name, seen_key)
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
@@ -280,14 +303,17 @@ if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()
     PARSER.add_argument(
         "--model_name", type=str, required=True,
-        choices=list(MODEL_TO_EMBEDS.keys()))
+        choices=list(MODEL_TO_SUBDIR.keys()))
     PARSER.add_argument(
-        "--seen_digits", nargs="+",
+        "--seen_digits", nargs="+", type=int,
         default=(0, 3, 5, 6, 8, 9),
+    )
+    PARSER.add_argument(
+        "--seen", action="store_true", type=bool,
     )
 
     # Parse arguments
     ARGS = PARSER.parse_args()
 
     # Call main
-    main(ARGS.model_name, ARGS.seen_digits)
+    main(ARGS.model_name, ARGS.seen_digits, ARGS.seen)
