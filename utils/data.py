@@ -20,10 +20,61 @@ warnings.simplefilter("ignore")
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
+# Set random seed for data generation
+SEED = 20240413
 
 ################################################################################
 #                               Helper Functions                               #
 ################################################################################
+def set_random_seed(seed):
+    """
+    Set random seed temporarily
+
+    Parameters
+    ----------
+    seed : int
+        Random seed
+
+    Returns
+    -------
+    list
+        List of random states
+    """
+    # Early exit, if seed is None
+    if seed is None:
+        return None
+
+    # Get current random states
+    random_states = [
+        random.getstate(),
+        torch.random.get_rng_state()
+    ]
+
+    # Set the temporary seed
+    random.seed(seed)
+    torch.manual_seed(seed)
+
+    return random_states
+
+
+def unset_random_seed(random_states):
+    """
+    Restore original random states.
+
+    Parameters
+    ----------
+    random_states : list
+        List of original random states
+    """
+    # Early exit, if no random states provided
+    if random_states is None:
+        return
+
+    # Restore the original state
+    random.setstate(random_states[0])
+    torch.random.set_rng_state(random_states[1])
+
+
 def color_digits_fixed(X, Y):
     """
     Color digits with fixed coloring (based on the image label)
@@ -76,7 +127,7 @@ def color_digits_fixed(X, Y):
     return res
 
 
-def color_digits_randomly(X, Y):
+def color_digits_randomly(X, Y, seed=SEED):
     """
     Color digits randomly (ignoring label).
 
@@ -92,6 +143,9 @@ def color_digits_randomly(X, Y):
     torch.Tensor
         MNIST images colored randomly
     """
+    # Set the random seed, if specified
+    random_states = set_random_seed(seed)
+
     res = []
     for x, y in zip(X, Y):
         x = x / 255
@@ -126,6 +180,10 @@ def color_digits_randomly(X, Y):
             pass
         res.append(img.clip(0,1))
     res = torch.stack(res)
+
+    # Unset the random seed
+    unset_random_seed(random_states)
+
     return res
 
 
@@ -164,7 +222,7 @@ def split_seen_and_unseen_digits(X, Y, seen_digits=tuple(range(5))):
     return (X_seen, Y_seen), (X_unseen, Y_unseen)
 
 
-def shuffle_data(X, Y):
+def shuffle_data(X, Y, seed=SEED):
     """
     Shuffle data.
 
@@ -174,21 +232,29 @@ def shuffle_data(X, Y):
         MNIST image
     Y : torch.Tensor
         Digit labels
+    seed : int, optional
+        Set random seed
 
     Returns
     -------
     tuple of (torch.Tensor, torch.Tensor)
         Shuffled data
     """
+    # Set the random seed, if specified
+    random_states = set_random_seed(seed)
+
     # Shuffle training and test data
     rand_perm = torch.randperm(len(X))
     X = X[rand_perm]
     Y = Y[rand_perm]
 
+    # Unset the random seed
+    unset_random_seed(random_states)
+
     return X, Y
 
 
-def split_train_val(X, Y, val_size=0.25, shuffle=True):
+def split_train_val(X, Y, val_size=0.25, shuffle=True, seed=SEED):
     """
     Split data into training and validation splits.
 
@@ -202,6 +268,8 @@ def split_train_val(X, Y, val_size=0.25, shuffle=True):
         Proportion to leave for validation, by default 0.25
     shuffle : bool, optional
         If True, shuffle data before splitting, by default True
+    seed : int, optional
+        Set random seed
 
     Returns
     -------
@@ -210,7 +278,7 @@ def split_train_val(X, Y, val_size=0.25, shuffle=True):
     """
     # If specified, shuffle data first
     if shuffle:
-        X, Y = shuffle_data(X, Y)
+        X, Y = shuffle_data(X, Y, seed=seed)
 
     # Split into training and validation sets
     val_idx = int(len(X) * val_size)
@@ -227,7 +295,7 @@ def send_to_device(X, Y, device=DEVICE):
     return (X.to(device).float(), Y.to(device))
 
 
-def load_data(seen_digits=tuple(range(5)), device=DEVICE):
+def load_data(seen_digits=tuple(range(5)), device=DEVICE, seed=SEED):
     """
     Load MNIST data.
 
@@ -280,11 +348,13 @@ def load_data(seen_digits=tuple(range(5)), device=DEVICE):
         X_train_seen, Y_train_seen,
         val_size=0.5,
         shuffle=True,
+        seed=seed,
     )
     (X_id_test_seen, Y_id_test_seen), (X_ood_test_seen, Y_ood_test_seen) = split_train_val(
         X_test_seen, Y_test_seen,
         val_size=0.5,
         shuffle=True,
+        seed=seed,
     )
 
     # Split training data into training and validation sets
@@ -293,12 +363,14 @@ def load_data(seen_digits=tuple(range(5)), device=DEVICE):
         X_id_train_seen, Y_id_train_seen,
         val_size=0.2,
         shuffle=True,
+        seed=seed,
     )
     # NOTE: 50% (40-10) is used for covariate OOD train-val set (random colors)
     (X_ood_train_seen, Y_ood_train_seen), (X_ood_val_seen, Y_ood_val_seen) = split_train_val(
         X_ood_train_seen, Y_ood_train_seen,
         val_size=0.2,
         shuffle=True,
+        seed=seed,
     )
 
     # Color data
@@ -306,7 +378,6 @@ def load_data(seen_digits=tuple(range(5)), device=DEVICE):
     X_id_train_seen = color_digits_fixed(X_id_train_seen, Y_id_train_seen)
     X_id_val_seen = color_digits_fixed(X_id_val_seen, Y_id_val_seen)
     X_id_test_seen = color_digits_fixed(X_id_test_seen, Y_id_test_seen)
-
 
     # NOTE: OOD train/val/test set  (seen digits with random colors)
     X_ood_train_seen = color_digits_randomly(X_ood_train_seen, Y_ood_train_seen)
