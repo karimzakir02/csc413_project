@@ -208,7 +208,7 @@ def shuffle_data(X, Y):
     return X, Y
 
 
-def split_train_val(X, Y, val_size=0.25, shuffle=True, seed=SEED):
+def split_train_val(X, Y, val_size=0.25, shuffle=True):
     """
     Split data into training and validation splits.
 
@@ -222,8 +222,6 @@ def split_train_val(X, Y, val_size=0.25, shuffle=True, seed=SEED):
         Proportion to leave for validation, by default 0.25
     shuffle : bool, optional
         If True, shuffle data before splitting, by default True
-    seed : int, optional
-        Set random seed
 
     Returns
     -------
@@ -232,7 +230,7 @@ def split_train_val(X, Y, val_size=0.25, shuffle=True, seed=SEED):
     """
     # If specified, shuffle data first
     if shuffle:
-        X, Y = shuffle_data(X, Y, seed=seed)
+        X, Y = shuffle_data(X, Y)
 
     # Split into training and validation sets
     val_idx = int(len(X) * val_size)
@@ -310,13 +308,11 @@ def load_data(seen_digits=tuple(range(5)), device=DEVICE, seed=SEED):
         X_train_seen, Y_train_seen,
         val_size=0.5,
         shuffle=True,
-        seed=seed,
     )
     (X_id_test_seen, Y_id_test_seen), (X_ood_test_seen, Y_ood_test_seen) = split_train_val(
         X_test_seen, Y_test_seen,
         val_size=0.5,
         shuffle=True,
-        seed=seed,
     )
 
     # Split training data into training and validation sets
@@ -325,14 +321,12 @@ def load_data(seen_digits=tuple(range(5)), device=DEVICE, seed=SEED):
         X_id_train_seen, Y_id_train_seen,
         val_size=0.2,
         shuffle=True,
-        seed=seed,
     )
     # NOTE: 50% (40-10) is used for covariate OOD train-val set (random colors)
     (X_ood_train_seen, Y_ood_train_seen), (X_ood_val_seen, Y_ood_val_seen) = split_train_val(
         X_ood_train_seen, Y_ood_train_seen,
         val_size=0.2,
         shuffle=True,
-        seed=seed,
     )
 
     # Color data
