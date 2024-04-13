@@ -9,6 +9,7 @@ import random
 import warnings
 
 # Non-standard libraries
+import numpy as np
 import torch
 import torchvision
 
@@ -28,51 +29,18 @@ SEED = 20240413
 ################################################################################
 def set_random_seed(seed):
     """
-    Set random seed temporarily
+    Set random seed
 
     Parameters
     ----------
     seed : int
         Random seed
-
-    Returns
-    -------
-    list
-        List of random states
     """
-    # Early exit, if seed is None
-    if seed is None:
-        return None
-
-    # Get current random states
-    random_states = [
-        random.getstate(),
-        torch.random.get_rng_state()
-    ]
-
     # Set the temporary seed
     random.seed(seed)
+    np.random.seed(seed)
     torch.manual_seed(seed)
-
-    return random_states
-
-
-def unset_random_seed(random_states):
-    """
-    Restore original random states.
-
-    Parameters
-    ----------
-    random_states : list
-        List of original random states
-    """
-    # Early exit, if no random states provided
-    if random_states is None:
-        return
-
-    # Restore the original state
-    random.setstate(random_states[0])
-    torch.random.set_rng_state(random_states[1])
+    torch.cuda.manual_seed(seed)
 
 
 def color_digits_fixed(X, Y):
@@ -127,7 +95,7 @@ def color_digits_fixed(X, Y):
     return res
 
 
-def color_digits_randomly(X, Y, seed=SEED):
+def color_digits_randomly(X, Y):
     """
     Color digits randomly (ignoring label).
 
@@ -143,9 +111,6 @@ def color_digits_randomly(X, Y, seed=SEED):
     torch.Tensor
         MNIST images colored randomly
     """
-    # Set the random seed, if specified
-    random_states = set_random_seed(seed)
-
     res = []
     for x, y in zip(X, Y):
         x = x / 255
@@ -180,9 +145,6 @@ def color_digits_randomly(X, Y, seed=SEED):
             pass
         res.append(img.clip(0,1))
     res = torch.stack(res)
-
-    # Unset the random seed
-    unset_random_seed(random_states)
 
     return res
 
@@ -222,7 +184,7 @@ def split_seen_and_unseen_digits(X, Y, seen_digits=tuple(range(5))):
     return (X_seen, Y_seen), (X_unseen, Y_unseen)
 
 
-def shuffle_data(X, Y, seed=SEED):
+def shuffle_data(X, Y):
     """
     Shuffle data.
 
@@ -232,24 +194,16 @@ def shuffle_data(X, Y, seed=SEED):
         MNIST image
     Y : torch.Tensor
         Digit labels
-    seed : int, optional
-        Set random seed
 
     Returns
     -------
     tuple of (torch.Tensor, torch.Tensor)
         Shuffled data
     """
-    # Set the random seed, if specified
-    random_states = set_random_seed(seed)
-
     # Shuffle training and test data
     rand_perm = torch.randperm(len(X))
     X = X[rand_perm]
     Y = Y[rand_perm]
-
-    # Unset the random seed
-    unset_random_seed(random_states)
 
     return X, Y
 
@@ -297,7 +251,7 @@ def send_to_device(X, Y, device=DEVICE):
 
 def load_data(seen_digits=tuple(range(5)), device=DEVICE, seed=SEED):
     """
-    Load MNIST data.
+    Load MNIST data. If seed specified, sets random seed.
 
     Note
     ----
@@ -310,6 +264,8 @@ def load_data(seen_digits=tuple(range(5)), device=DEVICE, seed=SEED):
         Other digits are considered "unseen" and used in testing.
     device : torch.device, optional
         Device to send data to, by default DEVICE
+    seed : int, optional
+        Random seed
 
     Returns
     -------
@@ -318,8 +274,14 @@ def load_data(seen_digits=tuple(range(5)), device=DEVICE, seed=SEED):
         "id_val_seen"    : In-Distribution Validation Set (with Seen Digits)
         "id_test_seen"   : In-Distribution Test Set       (with Seen Digits)
         "ood_train_seen" : Out-Of-Distribution Train Set  (with Seen Digits)
+        "ood_val_seen"   : Out-Of-Distribution Val. Set   (with Seen Digits)
+        "ood_test_seen"  : Out-Of-Distribution Test Set   (with Seen Digits)
         "ood_test_unseen": Out-Of-Distribution Test Set   (with Unseen Digits)
     """
+    # Set random seed, if specified
+    if seed is not None:
+        set_random_seed(seed)
+
     # Download data
     train_set = torchvision.datasets.MNIST('./data/mnist/', train=True, download=True)
     test_set = torchvision.datasets.MNIST('./data/mnist/', train=False, download=True)
