@@ -188,6 +188,38 @@ def shuffle_data(X, Y):
     return X, Y
 
 
+def split_train_val(X, Y, val_size=0.25, shuffle=True):
+    """
+    Split data into training and validation splits.
+
+    Parameters
+    ----------
+    X : torch.Tensor
+        Images
+    Y : torch.Tensor
+        Labels
+    val_size : float, optional
+        Proportion to leave for validation, by default 0.25
+    shuffle : bool, optional
+        If True, shuffle data before splitting, by default True
+
+    Returns
+    -------
+    tuple of ((imgs, labels), (imgs, labels))
+        First sub-tuple is for training, and second sub-tuple is for validation.
+    """
+    # If specified, shuffle data first
+    if shuffle:
+        X, Y = shuffle_data(X, Y)
+
+    # Split into training and validation sets
+    val_idx = int(len(X) * val_size)
+    X_val, Y_val = X[:val_idx], Y[:val_idx]
+    X_train, Y_train = X[val_idx:], Y[val_idx:]
+
+    return (X_train, Y_train), (X_val, Y_val)
+
+
 def send_to_device(X, Y, device=DEVICE):
     """
     Prepare data to send to device.
@@ -243,30 +275,45 @@ def load_data(seen_digits=tuple(range(5)), device=DEVICE):
     X_ood_test_unseen = torch.concat([X_train_unseen, X_test_unseen])
     Y_ood_test_unseen = torch.concat([Y_train_unseen, Y_test_unseen])
 
-    # Shuffle training and test data
-    X_train_seen, Y_train_seen = shuffle_data(X_train_seen, Y_train_seen)
-    X_test_seen, Y_test_seen = shuffle_data(X_test_seen, Y_test_seen)
-    X_ood_test_unseen, Y_ood_test_unseen = shuffle_data(X_ood_test_unseen, Y_ood_test_unseen)
+    # Split (half) training & testing data into ID and OOD (covariate shift)
+    (X_id_train_seen, Y_id_train_seen), (X_ood_train_seen, Y_ood_train_seen) = split_train_val(
+        X_train_seen, Y_train_seen,
+        val_size=0.5,
+        shuffle=True,
+    )
+    (X_id_test_seen, Y_id_test_seen), (X_ood_test_seen, Y_ood_test_seen) = split_train_val(
+        X_test_seen, Y_test_seen,
+        val_size=0.5,
+        shuffle=True,
+    )
 
-    # Split seen digit data into training and validation sets
-    # NOTE: 60% is used for ID training set (fixed colors)
-    # NOTE: 20% is used for ID validation set (fixed colors)
-    # NOTE: 20% is used for OOD training set (random colors)
-    val_size = int(len(X_train_seen) * 0.2)
-    X_id_val_seen, Y_id_val_seen = X_train_seen[:val_size], Y_train_seen[:val_size]
-    X_ood_train_seen, Y_ood_train_seen = X_train_seen[val_size:2*val_size], Y_train_seen[val_size:2*val_size]
-    X_id_train_seen, Y_id_train_seen = X_train_seen[2*val_size:], Y_train_seen[2*val_size:]
+    # Split training data into training and validation sets
+    # NOTE: 50% (40-10) is used for ID train-val set (fixed colors)
+    (X_id_train_seen, Y_id_train_seen), (X_id_val_seen, Y_id_val_seen) = split_train_val(
+        X_id_train_seen, Y_id_train_seen,
+        val_size=0.2,
+        shuffle=True,
+    )
+    # NOTE: 50% (40-10) is used for covariate OOD train-val set (random colors)
+    (X_ood_train_seen, Y_ood_train_seen), (X_ood_val_seen, Y_ood_val_seen) = split_train_val(
+        X_ood_train_seen, Y_ood_train_seen,
+        val_size=0.2,
+        shuffle=True,
+    )
 
     # Color data
-    # NOTE: ID training set (fixed colors)
-    # NOTE: ID validation set (fixed colors)
-    # NOTE: ID test set (fixed colors)
+    # NOTE: ID train/val/test set   (fixed colors)
     X_id_train_seen = color_digits_fixed(X_id_train_seen, Y_id_train_seen)
     X_id_val_seen = color_digits_fixed(X_id_val_seen, Y_id_val_seen)
-    X_test_seen = color_digits_fixed(X_test_seen, Y_test_seen)
-    # NOTE: OOD training set (random colors)
-    # NOTE: OOD test set (random colors)
+    X_id_test_seen = color_digits_fixed(X_id_test_seen, Y_id_test_seen)
+
+
+    # NOTE: OOD train/val/test set  (seen digits with random colors)
     X_ood_train_seen = color_digits_randomly(X_ood_train_seen, Y_ood_train_seen)
+    X_ood_val_seen = color_digits_randomly(X_ood_val_seen, Y_ood_val_seen)
+    X_ood_test_seen = color_digits_randomly(X_ood_test_seen, Y_ood_test_seen)
+
+    # NOTE: OOD test set            (unseen digits with random colors)
     X_ood_test_unseen = color_digits_randomly(X_ood_test_unseen, Y_ood_test_unseen)
 
     # Send to device
@@ -274,6 +321,8 @@ def load_data(seen_digits=tuple(range(5)), device=DEVICE):
     X_id_val_seen, Y_id_val_seen = send_to_device(X_id_val_seen, Y_id_val_seen, device)
     X_test_seen, Y_test_seen = send_to_device(X_test_seen, Y_test_seen, device)
     X_ood_train_seen, Y_ood_train_seen = send_to_device(X_ood_train_seen, Y_ood_train_seen, device)
+    X_ood_val_seen, Y_ood_val_seen = send_to_device(X_ood_val_seen, Y_ood_val_seen, device)
+    X_ood_test_seen, Y_ood_test_seen = send_to_device(X_ood_test_seen, Y_ood_test_seen, device)
     X_ood_test_unseen, Y_ood_test_unseen = send_to_device(X_ood_test_unseen, Y_ood_test_unseen, device)
 
     # Convert into Dataset objects
@@ -281,6 +330,8 @@ def load_data(seen_digits=tuple(range(5)), device=DEVICE):
     id_val_seen_dataset = torch.utils.data.TensorDataset(X_id_val_seen, Y_id_val_seen)
     id_test_seen_dataset = torch.utils.data.TensorDataset(X_test_seen, Y_test_seen)
     ood_train_seen_dataset = torch.utils.data.TensorDataset(X_ood_train_seen, Y_ood_train_seen)
+    ood_val_seen_dataset = torch.utils.data.TensorDataset(X_ood_val_seen, Y_ood_val_seen)
+    ood_test_seen_dataset = torch.utils.data.TensorDataset(X_ood_test_seen, Y_ood_test_seen)
     ood_test_unseen_dataset = torch.utils.data.TensorDataset(X_ood_test_unseen, Y_ood_test_unseen)
 
     datasets = {
@@ -288,15 +339,20 @@ def load_data(seen_digits=tuple(range(5)), device=DEVICE):
         "id_val_seen": id_val_seen_dataset,
         "id_test_seen": id_test_seen_dataset,
         "ood_train_seen": ood_train_seen_dataset,
+        "ood_val_seen": ood_val_seen_dataset,
+        "ood_test_seen": ood_test_seen_dataset,
         "ood_test_unseen": ood_test_unseen_dataset,
     }
 
     # Print dataset details
-    print(f"Size of ID Training Set (Seen Digits): {len(id_train_seen_dataset)}")
-    print(f"Size of ID Validation Set (Seen Digits): {len(id_val_seen_dataset)}")
-    print(f"Size of ID Test Set (Seen Digits): {len(id_test_seen_dataset)}")
+    print(f"Size of ID Training Set     (Seen Digits): {len(id_train_seen_dataset)}")
+    print(f"Size of ID Validation Set   (Seen Digits): {len(id_val_seen_dataset)}")
+    print(f"Size of ID Test Set         (Seen Digits): {len(id_test_seen_dataset)}")
     print("")
-    print(f"Size of OOD Train Set (Seen Digits): {len(ood_train_seen_dataset)}")
-    print(f"Size of OOD Test Set (Unseen Digits): {len(ood_test_unseen_dataset)}")
+    print(f"Size of OOD Training Set    (Seen Digits): {len(ood_train_seen_dataset)}")
+    print(f"Size of OOD Validation Set  (Seen Digits): {len(ood_val_seen_dataset)}")
+    print(f"Size of OOD Test Set        (Seen Digits): {len(ood_test_seen_dataset)}")
+    print("")
+    print(f"Size of OOD Test Set        (Unseen Digits): {len(ood_test_unseen_dataset)}")
 
     return datasets
