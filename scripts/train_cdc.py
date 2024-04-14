@@ -301,8 +301,7 @@ class DisagreementClassifier(torch.nn.Module):
         self.disagreement_loss = disagreement_loss
 
 
-    def train_first_model(self, id_train_dl, id_val_dl, id_test_dl,
-                          ood_train_dl):
+    def train_first_model(self, id_train_dl, id_val_dl, ood_train_dl):
         """
         Train first (vanilla) model.
 
@@ -312,8 +311,6 @@ class DisagreementClassifier(torch.nn.Module):
             In-distribution training set (with seen classes)
         id_val_dl : torch.utils.data.DataLoader
             In-distribution validation set (with seen classes)
-        id_test_dl : torch.utils.data.DataLoader
-            In-distribution test set (with seen classes)
         ood_train_dl : torch.utils.data.DataLoader
             Out-of-distribution training set
 
@@ -362,25 +359,19 @@ class DisagreementClassifier(torch.nn.Module):
                 "ood_train_acc": ood_train_acc,
             })
 
-        # Compute test accuracy
-        id_test_acc = compute_accuracy(self.first_model, id_test_dl)
-        print(f"Epoch {epoch} |\tID Test Acc: {id_test_acc:.2f}")
-
         # Log metrics
         wandb.log({
             "model": "first",
             "epoch": epoch,
             "id_train_acc": id_train_acc,
             "id_val_acc": id_val_acc,
-            "id_test_acc": id_test_acc,
             "ood_train_acc": ood_train_acc,
         })
 
         self.first_model.eval()
 
 
-    def train_second_model(self, id_train_dl, id_val_dl, id_test_dl,
-                           ood_train_dl):
+    def train_second_model(self, id_train_dl, id_val_dl, ood_train_dl):
         """
         Train second (disagreement) model.
 
@@ -390,8 +381,6 @@ class DisagreementClassifier(torch.nn.Module):
             In-distribution training set
         id_val_dl : torch.utils.data.DataLoader
             In-distribution validation set
-        id_test_dl : torch.utils.data.DataLoader
-            In-distribution test set
         ood_train_dl : torch.utils.data.DataLoader
             Out-of-distribution training set
 
@@ -440,10 +429,10 @@ class DisagreementClassifier(torch.nn.Module):
                     ood_x = ood_x[entropy < target_entropy]
 
                 second_model_logits = self.second_model(ood_x)
-                disagreement_loss = self.disagreement_loss(first_model_logits, second_model_logits)
+                disagree_loss = self.disagreement_loss(first_model_logits, second_model_logits)
 
                 # 3. Combine losses
-                loss = erm_loss + (self.hparams.disagreement_alpha * disagreement_loss)
+                loss = erm_loss + (self.hparams.disagreement_alpha * disagree_loss)
 
                 # print(f"Epoch {epoch} Iter {iter_idx} | \tTrain Loss: {loss.item():.4f}, ERM Loss: {erm_loss.item():.4f}, Disagreement Loss: {disagreement_loss.item():.4f}")
                 # print(f"\t\tMin Entropy: {min_entropy}, Avg Entropy: {avg_entropy}, Max Entropy: {max_entropy}")
@@ -470,11 +459,6 @@ class DisagreementClassifier(torch.nn.Module):
                 "ood_train_acc": ood_train_acc,
             })
 
-        # Compute test accuracy
-        # id_test_acc = compute_accuracy_ensemble(models, id_test_dl)
-        id_test_acc = compute_accuracy(self.second_model, id_test_dl)
-        print(f"Epoch {epoch} | ID Test Acc: {id_test_acc:.2f}")
-
         # Revert first model to trainable
         self.first_model.train()
         self.second_model.eval()
@@ -485,12 +469,11 @@ class DisagreementClassifier(torch.nn.Module):
             "epoch": epoch,
             "id_train_acc": id_train_acc,
             "id_val_acc": id_val_acc,
-            "id_test_acc": id_test_acc,
             "ood_train_acc": ood_train_acc,
         })
 
 
-    def fit(self, id_train_data, id_val_data, id_test_data, ood_train_data, save_dir=None):
+    def fit(self, id_train_data, id_val_data, ood_train_data, save_dir=None):
         """
         Train first and second model.
 
@@ -499,8 +482,6 @@ class DisagreementClassifier(torch.nn.Module):
             In-distribution training set
         id_val_data : torch.utils.data.DataLoader
             In-distribution validation set
-        id_test_data : torch.utils.data.DataLoader
-            In-distribution test set
         ood_train_data : torch.utils.data.DataLoader
             Out-of-distribution training set
         save_dir : str, optional
@@ -509,9 +490,8 @@ class DisagreementClassifier(torch.nn.Module):
         # Create data loaders
         id_train_dl = DataLoader(id_train_data, batch_size=self.hparams.batch_size, shuffle=True)
         id_val_dl = DataLoader(id_val_data, batch_size=self.hparams.batch_size)
-        id_test_dl = DataLoader(id_test_data, batch_size=self.hparams.batch_size)
         ood_train_dl = DataLoader(ood_train_data, batch_size=self.hparams.batch_size, shuffle=True)
-        dataloaders = (id_train_dl, id_val_dl, id_test_dl, ood_train_dl)
+        dataloaders = (id_train_dl, id_val_dl, ood_train_dl)
 
         # Train first model
         self.train_first_model(*dataloaders)
@@ -592,7 +572,6 @@ def train():
         model.fit(
             id_train_data=dset_dicts["id_train_seen"],
             id_val_data=dset_dicts["id_val_seen"],
-            id_test_data=dset_dicts["id_test_seen"],
             ood_train_data=dset_dicts["ood_train_seen"],
             save_dir=run_dir,
         )
