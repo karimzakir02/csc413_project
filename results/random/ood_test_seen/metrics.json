@@ -1,0 +1,11 @@
+{
+    "1-nn_accuracy": 0.7609,
+    "3-nn_accuracy": 0.7619,
+    "5-nn_accuracy": 0.7753,
+    "7-nn_accuracy": 0.7825,
+    "adjusted_rand_score": 0.027305530136835544,
+    "adjusted_mutual_info": 0.0540201760082631,
+    "homogeneity": 0.05568642998039554,
+    "completeness": 0.056972667943025725,
+    "silhouette": 0.1257280856370926
+}
