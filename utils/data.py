@@ -270,7 +270,6 @@ def load_data(seen_digits=tuple(range(5)), device=DEVICE, seed=SEED):
     dict of (str to torch.Dataset)
         "id_train_seen"  : In-Distribution Training Set   (with Seen Digits)
         "id_val_seen"    : In-Distribution Validation Set (with Seen Digits)
-        "id_test_seen"   : In-Distribution Test Set       (with Seen Digits)
         "ood_train_seen" : Out-Of-Distribution Train Set  (with Seen Digits)
         "ood_val_seen"   : Out-Of-Distribution Val. Set   (with Seen Digits)
         "ood_test_seen"  : Out-Of-Distribution Test Set   (with Seen Digits)
@@ -303,26 +302,31 @@ def load_data(seen_digits=tuple(range(5)), device=DEVICE, seed=SEED):
     X_ood_test_unseen = torch.concat([X_train_unseen, X_test_unseen])
     Y_ood_test_unseen = torch.concat([Y_train_unseen, Y_test_unseen])
 
+    # Set aside 20% of the training data for OOD test set (covariate shift)
+    (X_train_seen, Y_train_seen), (X_ood_test_seen, Y_ood_test_seen) = split_train_val(
+        X_train_seen, Y_train_seen,
+        val_size=0.2,
+        shuffle=True,
+    )
+    # NOTE: OOD test set (covariate shift) = MNIST original test set + 20% of training data
+    X_ood_test_seen = torch.concat([X_test_seen, X_ood_test_seen])
+    Y_ood_test_seen = torch.concat([Y_test_seen, Y_ood_test_seen])
+
     # Split (half) training & testing data into ID and OOD (covariate shift)
     (X_id_train_seen, Y_id_train_seen), (X_ood_train_seen, Y_ood_train_seen) = split_train_val(
         X_train_seen, Y_train_seen,
         val_size=0.5,
         shuffle=True,
     )
-    (X_id_test_seen, Y_id_test_seen), (X_ood_test_seen, Y_ood_test_seen) = split_train_val(
-        X_test_seen, Y_test_seen,
-        val_size=0.5,
-        shuffle=True,
-    )
 
     # Split training data into training and validation sets
-    # NOTE: 50% (40-10) is used for ID train-val set (fixed colors)
+    # NOTE: 40% (32-8) is used for ID train-val set (fixed colors)
     (X_id_train_seen, Y_id_train_seen), (X_id_val_seen, Y_id_val_seen) = split_train_val(
         X_id_train_seen, Y_id_train_seen,
         val_size=0.2,
         shuffle=True,
     )
-    # NOTE: 50% (40-10) is used for covariate OOD train-val set (random colors)
+    # NOTE: 40% (32-8) is used for covariate OOD train-val set (random colors)
     (X_ood_train_seen, Y_ood_train_seen), (X_ood_val_seen, Y_ood_val_seen) = split_train_val(
         X_ood_train_seen, Y_ood_train_seen,
         val_size=0.2,
@@ -333,7 +337,6 @@ def load_data(seen_digits=tuple(range(5)), device=DEVICE, seed=SEED):
     # NOTE: ID train/val/test set   (fixed colors)
     X_id_train_seen = color_digits_fixed(X_id_train_seen, Y_id_train_seen)
     X_id_val_seen = color_digits_fixed(X_id_val_seen, Y_id_val_seen)
-    X_id_test_seen = color_digits_fixed(X_id_test_seen, Y_id_test_seen)
 
     # NOTE: OOD train/val/test set  (seen digits with random colors)
     X_ood_train_seen = color_digits_randomly(X_ood_train_seen, Y_ood_train_seen)
@@ -346,7 +349,6 @@ def load_data(seen_digits=tuple(range(5)), device=DEVICE, seed=SEED):
     # Send to device
     X_id_train_seen, Y_id_train_seen = send_to_device(X_id_train_seen, Y_id_train_seen, device)
     X_id_val_seen, Y_id_val_seen = send_to_device(X_id_val_seen, Y_id_val_seen, device)
-    X_id_test_seen, Y_id_test_seen = send_to_device(X_id_test_seen, Y_id_test_seen, device)
     X_ood_train_seen, Y_ood_train_seen = send_to_device(X_ood_train_seen, Y_ood_train_seen, device)
     X_ood_val_seen, Y_ood_val_seen = send_to_device(X_ood_val_seen, Y_ood_val_seen, device)
     X_ood_test_seen, Y_ood_test_seen = send_to_device(X_ood_test_seen, Y_ood_test_seen, device)
@@ -355,7 +357,6 @@ def load_data(seen_digits=tuple(range(5)), device=DEVICE, seed=SEED):
     # Convert into Dataset objects
     id_train_seen_dataset = torch.utils.data.TensorDataset(X_id_train_seen, Y_id_train_seen)
     id_val_seen_dataset = torch.utils.data.TensorDataset(X_id_val_seen, Y_id_val_seen)
-    id_test_seen_dataset = torch.utils.data.TensorDataset(X_id_test_seen, Y_id_test_seen)
     ood_train_seen_dataset = torch.utils.data.TensorDataset(X_ood_train_seen, Y_ood_train_seen)
     ood_val_seen_dataset = torch.utils.data.TensorDataset(X_ood_val_seen, Y_ood_val_seen)
     ood_test_seen_dataset = torch.utils.data.TensorDataset(X_ood_test_seen, Y_ood_test_seen)
@@ -364,7 +365,6 @@ def load_data(seen_digits=tuple(range(5)), device=DEVICE, seed=SEED):
     datasets = {
         "id_train_seen": id_train_seen_dataset,
         "id_val_seen": id_val_seen_dataset,
-        "id_test_seen": id_test_seen_dataset,
         "ood_train_seen": ood_train_seen_dataset,
         "ood_val_seen": ood_val_seen_dataset,
         "ood_test_seen": ood_test_seen_dataset,
@@ -374,7 +374,6 @@ def load_data(seen_digits=tuple(range(5)), device=DEVICE, seed=SEED):
     # Print dataset details
     print(f"Size of ID Training Set     (Seen Digits): {len(id_train_seen_dataset)}")
     print(f"Size of ID Validation Set   (Seen Digits): {len(id_val_seen_dataset)}")
-    print(f"Size of ID Test Set         (Seen Digits): {len(id_test_seen_dataset)}")
     print("")
     print(f"Size of OOD Training Set    (Seen Digits): {len(ood_train_seen_dataset)}")
     print(f"Size of OOD Validation Set  (Seen Digits): {len(ood_val_seen_dataset)}")
