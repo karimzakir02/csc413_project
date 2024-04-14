@@ -270,7 +270,7 @@ class HParams:
     disagreement_alpha: float = 0.5
     # Used to filter OOD data based on entropy in first model predictions
     entropy_q: float = 1.0    # 0.25 = bottom 25 entropy
-    init: str = "ZerO"        # "ZerO" or PyTorch default
+    init: str = None        # "ZerO" or None for PyTorch default
 
 
 class DisagreementClassifier(torch.nn.Module):
@@ -345,9 +345,8 @@ class DisagreementClassifier(torch.nn.Module):
                 self.first_opt.step()
 
                 # TODO: Remove
-                ood_train_acc = compute_accuracy(self.first_model, ood_train_dl)
-
-                print(f"Epoch {epoch} Iter {iter_idx} | \tTrain Loss: {loss.item():.4f}, OOD Train Acc: {ood_train_acc:.2f}")
+                # ood_train_acc = compute_accuracy(self.first_model, ood_train_dl)
+                # print(f"Epoch {epoch} Iter {iter_idx} | \tTrain Loss: {loss.item():.4f}, OOD Train Acc: {ood_train_acc:.2f}")
 
             id_train_acc = compute_accuracy(self.first_model, id_train_dl)
             id_val_acc = compute_accuracy(self.first_model, id_val_dl)
@@ -668,9 +667,11 @@ def extract(run_dir):
     dset_dicts = data.load_data(hparams.seen_digits)
 
     # Extract features on OOD data
+    ood_test_seen_feats = model.extract_disagreement_features(dset_dicts["ood_test_seen"])
     ood_test_unseen_feats = model.extract_disagreement_features(dset_dicts["ood_test_unseen"])
 
     # Store features
+    np.savez(os.path.join(run_dir, "ood_test_seen_feats.npz"), embeds=ood_test_seen_feats)
     np.savez(os.path.join(run_dir, "ood_test_unseen_feats.npz"), embeds=ood_test_unseen_feats)
 
 
@@ -694,6 +695,8 @@ if __name__ == "__main__":
     # 3. Call function
     if ARGS.action == "train":
         train()
+        # TODO: Remove
+        extract(wandb.run.id)
     elif ARGS.action == "perform_sweep":
         perform_sweep()
     elif ARGS.action == "extract":
