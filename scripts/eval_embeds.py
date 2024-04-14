@@ -43,13 +43,13 @@ MODEL_TO_SUBDIR = {
     # 0. Random Baseline
 
     # 1. Baseline (trained on ID data with seen digits)
-    # "id_baseline": os.path.join("baseline", "sqyfixna"),
+    "id_baseline": os.path.join("baseline", "b57lgtqj"),
 
     # 2. Baseline (trained on OOD data (cov. shift) with seen digits)
-    # "ood_baseline": os.path.join("baseline", "99yc6d4l"),
+    "ood_baseline": os.path.join("baseline", "sfacff20"),
 
     # 3. Disagreement Model (trained on ID and unlabeled OOD data with seen digits)
-    # "cdc": os.path.join("cdc", "d01h0u3o"),
+    "cdc": os.path.join("cdc", "he671o82"),
 
     # 4. Self-Supervised Model (trained on OOD data with seen digits)
     "ssl_byol": os.path.join("ssl_byol_encoder"),
@@ -309,7 +309,7 @@ if __name__ == "__main__":
         default=(0, 3, 5, 6, 8, 9),
     )
     PARSER.add_argument(
-        "--seen", action="store_true", type=bool,
+        "--seen", action="store_true",
     )
 
     # Parse arguments
