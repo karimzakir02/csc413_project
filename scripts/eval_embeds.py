@@ -41,19 +41,19 @@ DIR_RESULTS = "results"
 # Mapping of model to checkpoint subdirectory
 MODEL_TO_SUBDIR = {
     # 0. Randomly Initialize Baseline
-    "random_baseline": os.path.join("baseline", "enyn0xwy"),
+    "random_baseline": os.path.join("baseline", "z7mi9xm9"),
 
     # 0.1 ZerO Initialized Baseline
-    "zero_baseline": os.path.join("baseline", "y0bjpqz0"),
+    "zero_baseline": os.path.join("baseline", "p4cve6b6"),
 
     # 1. Baseline (trained on ID data with seen digits)
-    "id_baseline": os.path.join("baseline", "b57lgtqj"),
+    "id_baseline": os.path.join("baseline", "09xn0i9c"),
 
     # 2. Baseline (trained on OOD data (cov. shift) with seen digits)
-    "ood_baseline": os.path.join("baseline", "sfacff20"),
+    "ood_baseline": os.path.join("baseline", "y4zj35v8"),
 
     # 3. Disagreement Model (trained on ID and unlabeled OOD data with seen digits)
-    "cdc": os.path.join("cdc", "he671o82"),
+    "cdc": os.path.join("cdc", "ey3exgvt"),
 
     # 4. Self-Supervised Model (trained on OOD data with seen digits)
     "ssl_byol": os.path.join("ssl_byol_encoder"),
