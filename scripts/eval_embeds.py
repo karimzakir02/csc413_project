@@ -40,8 +40,11 @@ DIR_RESULTS = "results"
 
 # Mapping of model to checkpoint subdirectory
 MODEL_TO_SUBDIR = {
-    # 0. Random Baseline
-    "random": os.path.join("baseline", "enyn0xwy"),
+    # 0. Randomly Initialize Baseline
+    "random_baseline": os.path.join("baseline", "enyn0xwy"),
+
+    # 0.1 ZerO Initialized Baseline
+    "zero_baseline": os.path.join("baseline", "y0bjpqz0"),
 
     # 1. Baseline (trained on ID data with seen digits)
     "id_baseline": os.path.join("baseline", "b57lgtqj"),
