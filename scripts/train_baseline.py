@@ -158,7 +158,7 @@ class HParams:
     optimizer: str = "adamw"    # one of (sgd, adam, adamw)
 
     init: str = None            # "ZerO" or PyTorch default
-    train_data: str = "ood"      # one of ("id" or "ood")
+    train_data: str = "ood"      # one of ("id" or "ood" or "random")
 
 
 class BaselineClassifier(torch.nn.Module):
@@ -215,7 +215,7 @@ class BaselineClassifier(torch.nn.Module):
 
         # Train model
         for epoch in range(1, self.hparams.num_epochs+1):
-            for iter_idx, (x, y) in enumerate(train_dl):
+            for x, y in train_dl:
                 loss = self.erm_loss(self.model(x), y)
 
                 # Perform backprop
@@ -233,14 +233,15 @@ class BaselineClassifier(torch.nn.Module):
             wandb.log({
                 "model": "first",
                 "epoch": epoch,
-                "id_train_acc": train_acc,
-                "id_val_acc": val_acc,
+                f"{self.hparams.train_data}_train_acc": train_acc,
+                f"{self.hparams.train_data}_val_acc": val_acc,
             })
 
         self.model.eval()
 
 
-    def fit(self, id_train_data, id_val_data, ood_train_data, save_dir=None):
+    def fit(self, id_train_data, id_val_data, ood_train_data, ood_val_data,
+            save_dir=None):
         """
         Train first model.
 
@@ -251,11 +252,13 @@ class BaselineClassifier(torch.nn.Module):
             In-distribution validation set
         ood_train_data : torch.utils.data.DataLoader
             Out-of-distribution training set
+        ood_val_data : torch.utils.data.DataLoader
+            Out-of-distribution validation set
         save_dir : str, optional
             If provided, save hyperparameters and model weights to the directory
         """
         # Create data loaders
-        assert self.hparams.train_data in ("id", "ood")
+        assert self.hparams.train_data in ("id", "ood", "random")
         dataloaders = []
         if self.hparams.train_data == "id":
             id_train_dl = DataLoader(id_train_data, batch_size=self.hparams.batch_size, shuffle=True)
@@ -263,7 +266,8 @@ class BaselineClassifier(torch.nn.Module):
             dataloaders.extend([id_train_dl, id_val_dl])
         else:
             ood_train_dl = DataLoader(ood_train_data, batch_size=self.hparams.batch_size, shuffle=True)
-            dataloaders.append(ood_train_dl)
+            ood_val_dl = DataLoader(ood_val_data, batch_size=self.hparams.batch_size)
+            dataloaders.extend([ood_train_dl, ood_val_dl])
 
         # Train first model
         self.train_model(*dataloaders)
@@ -334,6 +338,7 @@ def train():
             id_train_data=dset_dicts["id_train_seen"],
             id_val_data=dset_dicts["id_val_seen"],
             ood_train_data=dset_dicts["ood_train_seen"],
+            ood_val_data=dset_dicts["ood_val_seen"],
             save_dir=run_dir,
         )
 
@@ -373,9 +378,11 @@ def extract(run_dir):
     dset_dicts = data.load_data(hparams.seen_digits)
 
     # Extract features on OOD data
+    ood_test_seen_feats = model.extract_features(dset_dicts["ood_test_seen"])
     ood_test_unseen_feats = model.extract_features(dset_dicts["ood_test_unseen"])
 
     # Store features
+    np.savez(os.path.join(run_dir, "ood_test_seen_feats.npz"), embeds=ood_test_seen_feats)
     np.savez(os.path.join(run_dir, "ood_test_unseen_feats.npz"), embeds=ood_test_unseen_feats)
 
 
@@ -399,6 +406,8 @@ if __name__ == "__main__":
     # 3. Call function
     if ARGS.action == "train":
         train()
+        # TODO: Remove extract
+        extract(wandb.run.id)
     elif ARGS.action == "extract":
         assert ARGS.run_dir, "If extracting features, please provide `run_dir`!"
         extract(ARGS.run_dir)
