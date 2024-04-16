@@ -3,7 +3,7 @@ eval_pop_cnn_filters.py
 
 Description: Code to test the popular CNN filters.
 """
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, Generator
 
 # Standard libraries
 import json
@@ -27,51 +27,57 @@ from models.backbone import LeNet
 from .train_cdc import HParams, dataloader_to_sampler, compute_accuracy, DEVICE
 from utils import data
 
+from itertools import permutations
 
 
-def create_filters() -> Dict[str, Tuple[torch.nn.Conv2d, torch.nn.Conv2d]]:
-    filters = {}
+def create_filters(sampled_filters: np.ndarray) -> Generator[Tuple[torch.nn.Conv2d, torch.nn.Conv2d]]:
+    num_filters1 = 3 * 6  # Filters needed for conv layer 1
+    num_filters2 = 6 * 16 # Filters needed for conv layer 2
 
-    #timm_resnet50 = timm.create_model("hf_hub:timm/resnet50.a1_in1k", pretrained=True)
-    #sample_filter(timm_resnet50.conv1, "timm_resnet50")
+    def sampled_filters_gen():
+        for perm_ind, filters_perm_ind in enumerate(permutations(np.arange(len(sampled_filters)), num_filters1 + num_filters2)):
+            weights1_ind = filters_perm_ind[:num_filters1]
+            weights2_ind = filters_perm_ind[num_filters1:num_filters1+num_filters2]
 
-    #google_vit_base = transformers.AutoModelForImageClassification.from_pretrained("google/vit-base-patch16-224")
-    #sample_filter(google_vit_base.vit.embeddings.patch_embeddings.projection, "google_vit_base")
+            weights1 = sampled_filters[weights1_ind]
+            weights2 = sampled_filters[weights2_ind]
+            del weights1_ind
+            del weights2_ind
 
-    return filters
+            model_name = f"sampled_cnn_{perm_ind}"
+
+            yield sample_filter(weights1, weights2, model_name)
     
-def sample_filter(conv_layer: torch.nn.Conv2d, cnn_model_name: str, filters) -> None:
+    # Return a generator to sample filters
+    return sampled_filters_gen
+    
+def sample_filter(weights1: np.ndarray, weights2: np.ndarray, cnn_model_name: str, filters) -> Tuple[torch.nn.Conv2d, torch.nn.Conv2d]:
     # Assumes a kernel_size of 3x3
-    if conv_layer.kernel_size != (3, 3):
+    if weights1.shape[:-2] != (3, 3):
         raise ValueError("Kernel size must be 3x3")
 
-    weights = conv_layer.weight
-    bias = conv_layer.bias
+    if weights2.shape[:-2] != (3, 3):
+        raise ValueError("Kernel size must be 3x3")
+
     # Sample channels need 3, 6 and 6, 16
     ## Sample first conv layer (3, 6)
-    out_channels = torch.tensor(random.sample(range(weights.size[0]), 6))
-    in_channels = torch.tensor(random.sample(range(weights.size[1]), 3))
+    out_channels = torch.tensor(random.sample(range(weights1.size[0]), 6))
+    in_channels = torch.tensor(random.sample(range(weights1.size[1]), 3))
 
-    sampled_weight = weights[out_channels][in_channels]
-    sampled_bias = bias[out_channels]
-    new_filter = torch.nn.Conv2d(3, 6, kernel_size=3, padding=2) # match LeNet, but with 3x3
-    new_filter.weight = sampled_weight
-    new_filter.bias = sampled_bias
-    
-    filters[cnn_model_name][0] = new_filter
+    sampled_weight = weights1[out_channels][in_channels]
+    filter1 = torch.nn.Conv2d(3, 6, kernel_size=3, padding=2) # match LeNet, but with 3x3
+    filter1.weight = sampled_weight
 
     ## Sample second conv layer (6, 16)
-    out_channels = torch.tensor(random.sample(range(weights.size[0]), 16))
-    in_channels = torch.tensor(random.sample(range(weights.size[1]), 6))
+    out_channels = torch.tensor(random.sample(range(weights2.size[0]), 16))
+    in_channels = torch.tensor(random.sample(range(weights2.size[1]), 6))
 
-    sampled_weight = weights[out_channels][in_channels]
-    sampled_bias = bias[out_channels]
-    new_filter = torch.nn.Conv2d(6, 16, kernel_size=3) # match LeNet but with 3x3
-    new_filter.weight = sampled_weight
-    new_filter.bias = sampled_bias
+    sampled_weight = weights2[out_channels][in_channels]
+    filter2 = torch.nn.Conv2d(6, 16, kernel_size=3) # match LeNet but with 3x3
+    filter2.weight = sampled_weight
     
-    filters[cnn_model_name][1] = new_filter
 
+    return filter1, filter2
 
 
 class CNNPopFilter(torch.nn.Module):
@@ -79,10 +85,10 @@ class CNNPopFilter(torch.nn.Module):
     A LeNet Model using Popular CNN Filters
     """
 
-    def __init__(self, num_classes: int, filter_names: Tuple[str], filters: Dict[str, Tuple[torch.nn.Conv2d, torch.nn.Conv2d]]):
+    def __init__(self, num_classes: int, filter_name: str, filters: Tuple[torch.nn.Conv2d, torch.nn.Conv2d]):
         super().__init__()
-        self.filter1, self.filter2 = filter_names
-        filter1, filter2 = filters[self.filter1][0], filters[self.filter2][1]
+        self.filter = filter_name
+        filter1, filter2 = filters
 
         self.cnn = LeNet(num_classes) 
 
