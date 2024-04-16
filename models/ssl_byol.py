@@ -176,23 +176,17 @@ def train_byol(data):
     ssl_byol.fit(train_loader, val_loader, epochs=20, print_every=5)
 
 
+@torch.no_grad()
 def forward_dataset(encoder, dataset):
     encoder.eval()
-    embeddings = None
-    labels = []
-
-    for X, y in dataset:
-        embedding = encoder(X[None])
-
-        labels.append(y)
-
-        if embeddings is None:
-            embeddings = embedding
-        else:
-            embeddings = torch.concat((embeddings, embedding), dim=0)
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=128, shuffle=False)
+    accum_feats = []
+    for X, _ in dataloader:
+        accum_feats.append(encoder(X).cpu())
+    embeddings = torch.cat(accum_feats).numpy()
 
     encoder.train()
-    return embeddings, labels
+    return embeddings
 
 
 def test_byol(data, data_name):
@@ -203,9 +197,7 @@ def test_byol(data, data_name):
     encoder_path = os.path.join("checkpoints", "ssl_byol_encoder", "checkpoint_20.pt")
     encoder.load_state_dict(torch.load(encoder_path))
 
-    ood_embeddings, _ = forward_dataset(encoder, ood_test)
-
-    ood_embeddings = ood_embeddings.detach().numpy()
+    ood_embeddings = forward_dataset(encoder, ood_test)
     save_path = os.path.join("checkpoints", "ssl_byol_encoder", f"{data_name}_feats.npz")
     np.savez(save_path, embeds=ood_embeddings)
 
