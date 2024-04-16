@@ -5,10 +5,13 @@ Description: Used to create colored MNIST datasets.
 """
 
 # Standard libraries
+import math
 import random
+import os
 import warnings
 
 # Non-standard libraries
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torchvision
@@ -23,6 +26,9 @@ DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 
 # Set random seed for data generation
 SEED = 20240413
+
+# Assets directory
+DIR_ASSETS = "assets"
 
 ################################################################################
 #                               Helper Functions                               #
@@ -247,7 +253,38 @@ def send_to_device(X, Y, device=DEVICE):
     return (X.to(device).float(), Y.to(device))
 
 
-def load_data(seen_digits=tuple(range(5)), device=DEVICE, seed=SEED):
+def get_class_stats(Y, digits):
+    """
+    Get stats on classes.
+
+    Parameters
+    ----------
+    Y : torch.Tensor
+        Labels
+    digits : list
+        Digits
+
+    Returns
+    -------
+    dict
+        Mapping of digit to counts.
+    """
+    # Get label counts
+    uniq_vals, counts = torch.unique(Y, return_counts=True)
+
+    # Decode label to digit
+    label_to_digit = {idx: digit for idx, digit in enumerate(digits)}
+
+    # Get count for each digit
+    class_stats = {}
+    for i, val in enumerate(uniq_vals):
+        digit = label_to_digit[val.item()]
+        class_stats[digit] = counts[i].item()
+
+    return class_stats
+
+
+def load_data(seen_digits=tuple(range(5)), device=DEVICE, seed=SEED, plot=False):
     """
     Load MNIST data. If seed specified, sets random seed.
 
@@ -264,6 +301,8 @@ def load_data(seen_digits=tuple(range(5)), device=DEVICE, seed=SEED):
         Device to send data to, by default DEVICE
     seed : int, optional
         Random seed
+    plot : bool, optional
+        If True, make gridplot for each dataset.
 
     Returns
     -------
@@ -346,6 +385,36 @@ def load_data(seen_digits=tuple(range(5)), device=DEVICE, seed=SEED):
     # NOTE: OOD test set            (unseen digits with random colors)
     X_ood_test_unseen = color_digits_randomly(X_ood_test_unseen, Y_ood_test_unseen)
 
+    # Log dataset details
+    unseen_digits = [digit for digit in range(10) if digit not in seen_digits]
+    print(f"Size of ID Training Set     (Seen Digits): {len(Y_id_train_seen)}")
+    print(f"\tClass Sizes: {get_class_stats(Y_id_train_seen, seen_digits)}")
+    print(f"Size of ID Validation Set   (Seen Digits): {len(Y_id_val_seen)}")
+    print(f"\tClass Sizes: {get_class_stats(Y_id_val_seen, seen_digits)}")
+    print("")
+    print(f"Size of OOD Training Set    (Seen Digits): {len(Y_ood_train_seen)}")
+    print(f"\tClass Sizes: {get_class_stats(Y_ood_train_seen, seen_digits)}")
+    print(f"Size of OOD Validation Set  (Seen Digits): {len(Y_ood_val_seen)}")
+    print(f"\tClass Sizes: {get_class_stats(Y_ood_val_seen, seen_digits)}")
+    print(f"Size of OOD Test Set        (Seen Digits): {len(Y_ood_test_seen)}")
+    print(f"\tClass Sizes: {get_class_stats(Y_ood_test_seen, seen_digits)}")
+    print("")
+    print(f"Size of OOD Test Set        (Unseen Digits): {len(Y_ood_test_unseen)}")
+    print(f"\tClass Sizes: {get_class_stats(Y_ood_test_unseen, unseen_digits)}")
+
+    # If specified, plot each type of image distribution
+    if plot:
+        plot_datasets = [
+            ("ID Data", "id_seen", X_id_train_seen),
+            ("OOD Data (Covariate Shift)", "ood_seen", X_ood_train_seen),
+            ("OOD Data (Covariate Shift + Label Shift)", "ood_unseen", X_ood_test_unseen)
+        ]
+        for fig_title, save_fname, X in plot_datasets:
+            gridplot_images(
+                X[:64], save_dir=DIR_ASSETS, save_fname=save_fname,
+                # fig_title=fig_title,
+            )
+
     # Send to device
     X_id_train_seen, Y_id_train_seen = send_to_device(X_id_train_seen, Y_id_train_seen, device)
     X_id_val_seen, Y_id_val_seen = send_to_device(X_id_val_seen, Y_id_val_seen, device)
@@ -371,23 +440,50 @@ def load_data(seen_digits=tuple(range(5)), device=DEVICE, seed=SEED):
         "ood_test_unseen": ood_test_unseen_dataset,
     }
 
-    # Print dataset details
-    print(f"Size of ID Training Set     (Seen Digits): {len(id_train_seen_dataset)}")
-    print(f"Size of ID Validation Set   (Seen Digits): {len(id_val_seen_dataset)}")
-    print("")
-    print(f"Size of OOD Training Set    (Seen Digits): {len(ood_train_seen_dataset)}")
-    print(f"Size of OOD Validation Set  (Seen Digits): {len(ood_val_seen_dataset)}")
-    print(f"Size of OOD Test Set        (Seen Digits): {len(ood_test_seen_dataset)}")
-    print("")
-    print(f"Size of OOD Test Set        (Unseen Digits): {len(ood_test_unseen_dataset)}")
-
     return datasets
+
+
+def gridplot_images(X,
+                    fig_title=None,
+                    save_dir=None,
+                    save_fname="classes_gridplot.png"):
+    """
+    Plot grid of images
+    """
+    num_imgs = len(X)
+    nrows = math.floor(math.sqrt(num_imgs))
+
+    # Take subset of images to make square
+    if len(X) > nrows ** 2:
+        X = X[:nrows ** 2]
+
+    # Create grid of images
+    grid_img = torchvision.utils.make_grid(X, nrow=nrows, padding=0)
+
+    # Create a new figure
+    plt.figure(figsize=(10, 10))
+    plt.axis('off')
+    plt.imshow(grid_img.permute(1, 2, 0))
+    if fig_title is not None:
+        plt.title(fig_title, fontsize=33)
+    plt.tight_layout()
+
+    # Early exit, if not saving
+    if not save_dir:
+        return
+
+    # Create directory, if not already exists
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    plt.savefig(os.path.join(save_dir, f"{save_fname}.png"))
 
 
 if __name__ == "__main__":
     # Verify seed setting
-    data_0 = load_data(seed=0)
-    data_1 = load_data(seed=0)
+    seen_digits = (0, 3, 5, 6, 8, 9)
+    data_0 = load_data(seen_digits=seen_digits, seed=0, plot=True)
+    data_1 = load_data(seen_digits=seen_digits, seed=0)
 
     # Check labels match up for training set
     train_dataset_0 = data_0["id_train_seen"]
