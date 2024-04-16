@@ -58,7 +58,7 @@ class SSL_BYOL(nn.Module):
         self.device = device
 
         self.online_augmentation = transforms.Compose([
-            transforms.RandomApply([transforms.CenterCrop((28, 28))], p=0.7),
+            transforms.RandomApply([transforms.RandomCrop((28, 28))], p=0.5),
 
             transforms.RandomHorizontalFlip(),
 
@@ -73,7 +73,7 @@ class SSL_BYOL(nn.Module):
         
         self.target_augmentation = transforms.Compose([
 
-            transforms.RandomApply([transforms.CenterCrop((28, 28))], p=0.3),
+            transforms.RandomApply([transforms.RandomCrop((28, 28))], p=0.5),
             transforms.RandomHorizontalFlip(),
 
             transforms.RandomApply(
@@ -164,9 +164,7 @@ class SSL_BYOL(nn.Module):
         return loss / count
 
 
-def train_byol(): 
-    data = load_data()
-    
+def train_byol(data):     
     train_data = torch.utils.data.ConcatDataset([data["id_train_seen"],
                                                  data["ood_train_seen"]])
 
@@ -197,23 +195,23 @@ def forward_dataset(encoder, dataset):
     return embeddings, labels
 
 
-def test_byol():
-    data = load_data(seen_digits=(0, 3, 5, 6, 8, 9))
-    id_test = data["id_test_seen"]
-    ood_test = data["ood_test_unseen"]
+def test_byol(data, data_name):
+    ood_test = data[data_name]
 
     encoder = LeNet()
     encoder.fc3 = nn.Identity()
-    encoder_path = os.path.join("checkpoints", "ssl_byol_encoder", "checkpoint_10.pt")
+    encoder_path = os.path.join("checkpoints", "ssl_byol_encoder", "checkpoint_20.pt")
     encoder.load_state_dict(torch.load(encoder_path))
 
     ood_embeddings, _ = forward_dataset(encoder, ood_test)
 
     ood_embeddings = ood_embeddings.detach().numpy()
-    print(ood_embeddings.shape)
-    save_path = os.path.join("checkpoints", "ssl_byol_encoder", "ood_test_unseen_feats.npz")
+    save_path = os.path.join("checkpoints", "ssl_byol_encoder", f"{data_name}_feats.npz")
     np.savez(save_path, embeds=ood_embeddings)
 
 
 if __name__=="__main__":
-    test_byol()
+    data = load_data(seen_digits=(0, 3, 5, 6, 8, 9))
+    train_byol(data)
+    test_byol(data, "ood_test_seen")
+    test_byol(data, "ood_test_unseen")
