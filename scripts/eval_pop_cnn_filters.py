@@ -30,7 +30,7 @@ from utils import data
 from itertools import permutations
 
 
-def create_filters(sampled_filters: np.ndarray) -> Generator[Tuple[torch.nn.Conv2d, torch.nn.Conv2d, str]]:
+def create_filters(sampled_filters: np.ndarray) -> Generator[Tuple[Tuple[torch.nn.Conv2d, torch.nn.Conv2d], str]]:
     num_filters1 = 3 * 6  # Filters needed for conv layer 1
     num_filters2 = 6 * 16 # Filters needed for conv layer 2
 
@@ -51,7 +51,7 @@ def create_filters(sampled_filters: np.ndarray) -> Generator[Tuple[torch.nn.Conv
     # Return a generator to sample filters
     return sampled_filters_gen
     
-def sample_filter(weights1: np.ndarray, weights2: np.ndarray, cnn_model_name: str) -> Tuple[torch.nn.Conv2d, torch.nn.Conv2d, str]:
+def sample_filter(weights1: np.ndarray, weights2: np.ndarray, cnn_model_name: str) -> Tuple[Tuple[torch.nn.Conv2d, torch.nn.Conv2d], str]:
     # Assumes a kernel_size of 3x3
     if weights1.shape[:-2] != (3, 3):
         raise ValueError("Kernel size must be 3x3")
