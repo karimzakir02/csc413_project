@@ -41,9 +41,9 @@ def create_filters() -> Dict[str, Tuple[torch.nn.Conv2d, torch.nn.Conv2d]]:
     return filters
     
 def sample_filter(conv_layer: torch.nn.Conv2d, cnn_model_name: str, filters) -> None:
-    # Assumes a kernel_size of 5
-    if conv_layer.kernel_size != (5, 5):
-        raise ValueError("Kernel size must be 5x5")
+    # Assumes a kernel_size of 3x3
+    if conv_layer.kernel_size != (3, 3):
+        raise ValueError("Kernel size must be 3x3")
 
     weights = conv_layer.weight
     bias = conv_layer.bias
@@ -54,7 +54,7 @@ def sample_filter(conv_layer: torch.nn.Conv2d, cnn_model_name: str, filters) -> 
 
     sampled_weight = weights[out_channels][in_channels]
     sampled_bias = bias[out_channels]
-    new_filter = torch.nn.Conv2d(3, 6, kernel_size=5, padding=2)
+    new_filter = torch.nn.Conv2d(3, 6, kernel_size=3, padding=2) # match LeNet, but with 3x3
     new_filter.weight = sampled_weight
     new_filter.bias = sampled_bias
     
@@ -66,7 +66,7 @@ def sample_filter(conv_layer: torch.nn.Conv2d, cnn_model_name: str, filters) -> 
 
     sampled_weight = weights[out_channels][in_channels]
     sampled_bias = bias[out_channels]
-    new_filter = torch.nn.Conv2d(6, 16, kernel_size=5)
+    new_filter = torch.nn.Conv2d(6, 16, kernel_size=3) # match LeNet but with 3x3
     new_filter.weight = sampled_weight
     new_filter.bias = sampled_bias
     
@@ -89,13 +89,13 @@ class CNNPopFilter(torch.nn.Module):
         # Validate Filters (Should match LeNet)
         if filter1.out_channels != self.cnn.conv1.out_channels \
             or filter1.in_channels != self.cnn.conv1.in_channels \
-            or filter1.kernel_size != self.cnn.conv1.kernel_size:
+            or filter1.kernel_size != (3, 3): # differs from LeNet in kernel size only
             
             raise ValueError("Filter 1 needs to match the LeNet configuration.")
         
         if filter2.out_channels != self.cnn.conv2.out_channels \
             or filter2.in_channels != self.cnn.conv2.in_channels \
-            or filter2.kernel_size != self.cnn.conv2.kernel_size:
+            or filter2.kernel_size != (3, 3): # differs from LeNet in kernel size only
             
             raise ValueError("Filter 1 needs to match the LeNet configuration.")
         
@@ -103,6 +103,12 @@ class CNNPopFilter(torch.nn.Module):
         self.cnn.conv1 = filter1
 
         self.cnn.conv2 = filter2
+
+        # Modify fc1
+        self.cnn.fc1 = torch.nn.Linear(
+            filter2.out_channels * 3 * 3, # Uses 3x3 Kernel size
+            self.cnn.fc1.out_features 
+        )
 
     def forward(self, x):
         return self.cnn(x)
