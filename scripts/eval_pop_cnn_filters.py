@@ -61,16 +61,16 @@ def sample_filter(weights1: np.ndarray, weights2: np.ndarray, cnn_model_name: st
 
     # Sample channels need 3, 6 and 6, 16
     ## Sample first conv layer (3, 6)
-    out_channels = torch.tensor(random.sample(range(weights1.size[0]), 6))
-    in_channels = torch.tensor(random.sample(range(weights1.size[1]), 3))
+    out_channels = torch.tensor(random.sample(range(weights1.shape[0]), 6))
+    in_channels = torch.tensor(random.sample(range(weights1.shape[1]), 3))
 
     sampled_weight = weights1[out_channels][in_channels]
     filter1 = torch.nn.Conv2d(3, 6, kernel_size=3, padding=2) # match LeNet, but with 3x3
     filter1.weight = sampled_weight
 
     ## Sample second conv layer (6, 16)
-    out_channels = torch.tensor(random.sample(range(weights2.size[0]), 16))
-    in_channels = torch.tensor(random.sample(range(weights2.size[1]), 6))
+    out_channels = torch.tensor(random.sample(range(weights2.shape[0]), 16))
+    in_channels = torch.tensor(random.sample(range(weights2.shape[1]), 6))
 
     sampled_weight = weights2[out_channels][in_channels]
     filter2 = torch.nn.Conv2d(6, 16, kernel_size=3) # match LeNet but with 3x3
