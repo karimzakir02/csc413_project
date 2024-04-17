@@ -224,10 +224,10 @@ def train(filters_path: str):
             model = CNNPopFilter(hparams.batch_size, hparams.num_classes, filter_name, filters)
             model = model.to(DEVICE)
             model.eval(
-                id_train_data=dset_dicts["id_train_seen"],
                 id_val_data=dset_dicts["id_val_seen"],
-                id_test_data=dset_dicts["id_val_seen"],
-                ood_train_data=dset_dicts["ood_train_seen"],
+                ood_test_data=dset_dicts["ood_test_seen"],
+                ood_val_data=dset_dicts["ood_val_seen"],
+                ood_test_un_data=dset_dicts["ood_test_unseen"]
             )
 
     except Exception as error_msg:
