@@ -51,7 +51,7 @@ def create_filters(sampled_filters: np.ndarray) -> Iterator[Tuple[Tuple[torch.nn
     # Return a generator to sample filters
     return sampled_filters_gen
     
-def sample_filter(weights1: np.ndarray, weights2: np.ndarray, cnn_model_name: str) -> Iterator[Tuple[torch.nn.Conv2d, torch.nn.Conv2d], str]:
+def sample_filter(weights1: np.ndarray, weights2: np.ndarray, cnn_model_name: str) -> Tuple[Tuple[torch.nn.Conv2d, torch.nn.Conv2d], str]:
     # Assumes a kernel_size of 3x3
     if weights1.shape[:-2] != (3, 3):
         raise ValueError("Kernel size must be 3x3")
