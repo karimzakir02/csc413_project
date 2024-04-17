@@ -38,8 +38,8 @@ def create_filters(sampled_filters: np.ndarray) -> Iterator[Tuple[Tuple[torch.nn
         weights1_ind = filters_perm_ind[:num_filters1]
         weights2_ind = filters_perm_ind[num_filters1:num_filters1+num_filters2]
 
-        weights1 = sampled_filters[weights1_ind]
-        weights2 = sampled_filters[weights2_ind]
+        weights1 = np.take(sampled_filters, weights1_ind, axis=0)
+        weights2 = np.take(sampled_filters, weights2_ind, axis=0)
         del weights1_ind
         del weights2_ind
 
