@@ -39,9 +39,9 @@ def create_filters(sampled_filters: np.ndarray) -> Iterator[Tuple[Tuple[torch.nn
         weights2_ind = filters_perm_ind[num_filters1:num_filters1+num_filters2]
 
         weights1 = np.take(sampled_filters, weights1_ind, axis=0)
-        weights1 = weights1.reshape((3, 6, 3, 3)) # reshape to match LeNet
+        weights1 = weights1.reshape((6, 3, 3, 3)) # reshape to match LeNet
         weights2 = np.take(sampled_filters, weights2_ind, axis=0)
-        weights2 = weights2.reshape((6, 16, 3, 3)) # reshape to match LeNet
+        weights2 = weights2.reshape((16, 6, 3, 3)) # reshape to match LeNet
         del weights1_ind
         del weights2_ind
 
