@@ -34,22 +34,20 @@ def create_filters(sampled_filters: np.ndarray) -> Iterator[Tuple[Tuple[torch.nn
     num_filters1 = 3 * 6  # Filters needed for conv layer 1
     num_filters2 = 6 * 16 # Filters needed for conv layer 2
 
-    def sampled_filters_gen():
-        for perm_ind, filters_perm_ind in enumerate(permutations(np.arange(len(sampled_filters)), num_filters1 + num_filters2)):
-            weights1_ind = filters_perm_ind[:num_filters1]
-            weights2_ind = filters_perm_ind[num_filters1:num_filters1+num_filters2]
+    for perm_ind, filters_perm_ind in enumerate(permutations(np.arange(len(sampled_filters)), num_filters1 + num_filters2)):
+        weights1_ind = filters_perm_ind[:num_filters1]
+        weights2_ind = filters_perm_ind[num_filters1:num_filters1+num_filters2]
 
-            weights1 = sampled_filters[weights1_ind]
-            weights2 = sampled_filters[weights2_ind]
-            del weights1_ind
-            del weights2_ind
+        weights1 = sampled_filters[weights1_ind]
+        weights2 = sampled_filters[weights2_ind]
+        del weights1_ind
+        del weights2_ind
 
-            model_name = f"sampled_cnn_{perm_ind}"
+        model_name = f"sampled_cnn_{perm_ind}"
 
-            yield sample_filter(weights1, weights2, model_name)
+        yield sample_filter(weights1, weights2, model_name)
     
-    # Return a generator to sample filters
-    return sampled_filters_gen
+    return None # No more filters to sample
     
 def sample_filter(weights1: np.ndarray, weights2: np.ndarray, cnn_model_name: str) -> Tuple[Tuple[torch.nn.Conv2d, torch.nn.Conv2d], str]:
     # Assumes a kernel_size of 3x3
