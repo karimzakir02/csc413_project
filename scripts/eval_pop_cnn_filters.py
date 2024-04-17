@@ -159,7 +159,7 @@ class CNNPopFilter(torch.nn.Module):
 
         # Log metrics
         wandb.log({
-            "model": f"Pop CNN Filter ({self.filters[0]},{self.filters[1]})",
+            "model": f"Pop CNN Filter ({self.filter})",
             "id_test_acc": id_test_acc,
             "id_val_acc": id_val_acc,
             "ood_train_acc": ood_train_acc,
