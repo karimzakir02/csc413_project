@@ -40,8 +40,12 @@ def create_filters(sampled_filters: np.ndarray) -> Iterator[Tuple[Tuple[torch.nn
 
         weights1 = np.take(sampled_filters, weights1_ind, axis=0)
         weights1 = weights1.reshape((6, 3, 3, 3)) # reshape to match LeNet
+        weights1 = torch.from_numpy(weights1)
+        
         weights2 = np.take(sampled_filters, weights2_ind, axis=0)
         weights2 = weights2.reshape((16, 6, 3, 3)) # reshape to match LeNet
+        weights2 = torch.from_numpy(weights2)
+
         del weights1_ind
         del weights2_ind
 
@@ -51,7 +55,7 @@ def create_filters(sampled_filters: np.ndarray) -> Iterator[Tuple[Tuple[torch.nn
     
     return None # No more filters to sample
     
-def sample_filter(weights1: np.ndarray, weights2: np.ndarray, cnn_model_name: str) -> Tuple[Tuple[torch.nn.Conv2d, torch.nn.Conv2d], str]:
+def sample_filter(weights1: torch.Tensor, weights2: torch.Tensor, cnn_model_name: str) -> Tuple[Tuple[torch.nn.Conv2d, torch.nn.Conv2d], str]:
     # Assumes a kernel_size of 3x3
     if weights1.shape[-2:] != (3, 3):
         raise ValueError(f"Kernel size must be 3x3, not {weights1.shape[-2:]}")
@@ -66,7 +70,7 @@ def sample_filter(weights1: np.ndarray, weights2: np.ndarray, cnn_model_name: st
 
     sampled_weight = weights1[out_channels][in_channels]
     filter1 = torch.nn.Conv2d(3, 6, kernel_size=3, padding=2) # match LeNet, but with 3x3
-    filter1.weight = sampled_weight
+    filter1.weight.data = sampled_weight
 
     ## Sample second conv layer (6, 16)
     out_channels = torch.tensor(random.sample(range(weights2.shape[0]), 16))
@@ -74,7 +78,7 @@ def sample_filter(weights1: np.ndarray, weights2: np.ndarray, cnn_model_name: st
 
     sampled_weight = weights2[out_channels][in_channels]
     filter2 = torch.nn.Conv2d(6, 16, kernel_size=3) # match LeNet but with 3x3
-    filter2.weight = sampled_weight
+    filter2.weight.data = sampled_weight
     
 
     return filter1, filter2, cnn_model_name
