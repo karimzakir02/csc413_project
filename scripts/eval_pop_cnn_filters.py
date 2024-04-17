@@ -119,7 +119,7 @@ class CNNPopFilter(torch.nn.Module):
 
         # Modify fc1
         self.cnn.fc1 = torch.nn.Linear(
-            filter2.out_channels * 3 * 3, # Uses 3x3 Kernel size
+            filter2.out_channels * 6 * 6, # After maxpooling
             self.cnn.fc1.out_features 
         )
 
