@@ -52,10 +52,10 @@ def create_filters(sampled_filters: np.ndarray) -> Iterator[Tuple[Tuple[torch.nn
 def sample_filter(weights1: np.ndarray, weights2: np.ndarray, cnn_model_name: str) -> Tuple[Tuple[torch.nn.Conv2d, torch.nn.Conv2d], str]:
     # Assumes a kernel_size of 3x3
     if weights1.shape[:-2] != (3, 3):
-        raise ValueError("Kernel size must be 3x3")
+        raise ValueError(f"Kernel size must be 3x3, not {weights1.shape[:-2]}")
 
     if weights2.shape[:-2] != (3, 3):
-        raise ValueError("Kernel size must be 3x3")
+        raise ValueError(f"Kernel size must be 3x3, not {weights2.shape[:-2]}")
 
     # Sample channels need 3, 6 and 6, 16
     ## Sample first conv layer (3, 6)
