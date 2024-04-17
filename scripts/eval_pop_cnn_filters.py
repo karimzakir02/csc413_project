@@ -85,8 +85,11 @@ class CNNPopFilter(torch.nn.Module):
     A LeNet Model using Popular CNN Filters
     """
 
-    def __init__(self, num_classes: int, filter_name: str, filters: Tuple[torch.nn.Conv2d, torch.nn.Conv2d]):
+    def __init__(self, batch_size: int, num_classes: int, filter_name: str, filters: Tuple[torch.nn.Conv2d, torch.nn.Conv2d]):
         super().__init__()
+        self.num_classes = num_classes
+        self.batch_size = batch_size
+
         self.filter = filter_name
         filter1, filter2 = filters
 
@@ -119,106 +122,78 @@ class CNNPopFilter(torch.nn.Module):
     def forward(self, x):
         return self.cnn(x)
 
-    def eval_filter_pair(self, id_val_dl, id_test_dl,
-                          ood_train_dl):
+    def eval_filter_pair(self, id_val_dl, ood_val_dl, ood_test_dl, ood_test_un_dl):
         """
         Train first (vanilla) model.
 
         Parameters
         ----------
-        id_train_dl : torch.utils.data.DataLoader
-            In-distribution training set (with seen classes)
-        id_val_dl : torch.utils.data.DataLoader
-            In-distribution validation set (with seen classes)
-        id_test_dl : torch.utils.data.DataLoader
-            In-distribution test set (with seen classes)
-        ood_train_dl : torch.utils.data.DataLoader
-            Out-of-distribution training set
-
+        id_val_data : torch.utils.data.DataLoader
+            In-distribution validation set
+        ood_val_data : torch.utils.data.DataLoader
+            Out-of-distribution validation set
+        ood_test_data : torch.utils.data.DataLoader
+            Out-of-distribution test set
+        ood_test_un_data : torch.utils.data.DataLoader
+            Out-of-distribution Unseen test set
+        
         Returns
         -------
         dict
-            Contains final accuracies on in-distribution training, validation
-            and test set, and out-of-distribution training set.
+            Contains final accuracies on in-distribution set, 
+            and out-of-distribution validation and test sets.
         """
         print("""
 ################################################################################
 #                                CNN Filter                                    #
 ################################################################################""")
-        # Compute val accuracy
+        # Compute accuracy
         id_val_acc = compute_accuracy(self, id_val_dl)
-        print(f"ID Val Acc: {id_val_acc:.2f}")
+        print(f"ID Val Acc (Seen): {id_val_acc:.2f}")
 
-        # Compute test accuracy
-        id_test_acc = compute_accuracy(self, id_test_dl)
-        print(f"ID Test Acc: {id_test_acc:.2f}")
+        ood_val_acc = compute_accuracy(self, ood_val_dl)
+        print(f"OOD Val Acc (Seen): {ood_val_acc:.2f}")
 
-        # Compute ood accuracy
-        ood_train_acc = compute_accuracy(self, ood_train_dl)
-        print(f"OOD Acc: {id_test_acc:.2f}")
+        ood_test_acc = compute_accuracy(self, ood_test_dl)
+        print(f"OOD Acc (Seen): {ood_test_acc:.2f}")
+
+        ood_test_un_acc = compute_accuracy(self, ood_test_un_dl)
+        print(f"OOD Acc (Unseen): {ood_test_un_acc:.2f}")
+
 
         # Log metrics
         wandb.log({
             "model": f"Pop CNN Filter ({self.filter})",
-            "id_test_acc": id_test_acc,
             "id_val_acc": id_val_acc,
-            "ood_train_acc": ood_train_acc,
+            "ood_val_acc": ood_val_acc,
+            "ood_test_acc": ood_test_acc,
+            "ood_test_un_acc": ood_test_un_acc
         })
 
 
-    def eval(self, id_val_data, id_test_data, ood_train_data):
+    def eval(self, id_val_data, ood_val_data, ood_test_data, ood_test_un_data):
         """
         Train first and second model.
 
         ----------
-        id_train_data : torch.utils.data.DataLoader
-            In-distribution training set
-        id_val_data : torch.utils.data.DataLoader
+        id_val_data : torch.utils.data.TensorDataset
             In-distribution validation set
-        id_test_data : torch.utils.data.DataLoader
-            In-distribution test set
-        ood_train_data : torch.utils.data.DataLoader
-            Out-of-distribution training set
+        ood_val_data : torch.utils.data.TensorDataset
+            Out-of-distribution validation set
+        ood_test_data : torch.utils.data.TensorDataset
+            Out-of-distribution test set
+        ood_test_un_data : torch.utils.data.TensorDataset
+            Out-of-distribution unseen test set
         """
         # Create data loaders
-        id_val_dl = DataLoader(id_val_data, batch_size=self.hparams.batch_size)
-        id_test_dl = DataLoader(id_test_data, batch_size=self.hparams.batch_size)
-        ood_train_dl = DataLoader(ood_train_data, batch_size=self.hparams.batch_size, shuffle=True)
-        dataloaders = (id_val_dl, id_test_dl, ood_train_dl)
+        id_val_dl = DataLoader(id_val_data, batch_size=self.batch_size)
+        ood_val_dl = DataLoader(ood_val_data, batch_size=self.batch_size)
+        ood_test_dl = DataLoader(ood_test_data, batch_size=self.batch_size)
+        ood_test_un_dl = DataLoader(ood_test_un_data, batch_size=self.batch_size)
+
+        dataloaders = (id_val_dl, ood_val_dl, ood_test_dl, ood_test_un_dl)
 
         self.eval_filter_pair(*dataloaders)
-
-
-
-    @torch.no_grad()
-    def extract_cnn_filter_features(self, dataset):
-        """
-        Extract features using second (disagreement) model.
-
-        Parameters
-        ----------
-        dataset : torch.utils.data.Dataset
-            Dataset
-
-        Returns
-        -------
-        torch.Tensor
-            Extracted features for each sample in the dataset
-        """
-        self.second_model.eval()
-
-        # Preare dataloader
-        dataloader = DataLoader(dataset, self.hparams.batch_size, shuffle=False)
-
-        # Extract features for all data in the adtaset
-        accum_feats = []
-        for X, _ in dataloader:
-            accum_feats.append(self.second_model.extract_features(X))
-        accum_feats = torch.cat(accum_feats).numpy()
-
-        self.second_model.train()
-        return accum_feats
-
 
 @click.group()
 def cli():
@@ -226,7 +201,8 @@ def cli():
 
 
 @cli.command()
-def train():
+@click.option("--filters-path", type=str, help="Path to sampled filters")
+def train(filters_path: str):
     """
     Train disagreement model.
     """
@@ -236,61 +212,22 @@ def train():
 
     # Load data
     dset_dicts = data.load_data(wandb.config.get("seen_digits", hparams.seen_digits))
-    del hparams
-
-    # Create directory for current run
-    run_dir = os.path.join("checkpoints", "cdc", wandb.run.id)
-    os.makedirs(run_dir)
-
+    sampled_filters = np.load(filters_path) # Load sampled CNN filters
+    
     try:
-        # Train disagreement-based classifier
-        model = CNNPopFilters(hparams)
-        model = model.to(DEVICE)
-        model.fit(
-            id_train_data=dset_dicts["id_train_seen"],
-            id_val_data=dset_dicts["id_val_seen"],
-            id_test_data=dset_dicts["id_val_seen"],
-            ood_train_data=dset_dicts["ood_train_seen"],
-            save_dir=run_dir,
-        )
+        # Evaluate each filter combination
+        for filter_name, filters in create_filters(sampled_filters):
+            model = CNNPopFilter(hparams.batch_size, hparams.num_classes, filter_name, filters)
+            model = model.to(DEVICE)
+            model.eval(
+                id_train_data=dset_dicts["id_train_seen"],
+                id_val_data=dset_dicts["id_val_seen"],
+                id_test_data=dset_dicts["id_val_seen"],
+                ood_train_data=dset_dicts["ood_train_seen"],
+            )
 
     except Exception as error_msg:
-        # Remove directory
-        os.rmdir(run_dir)
-
         raise error_msg
-
-
-
-@cli.command()
-@click.option("--run_dir", type=str, help="Name of CDC run sub-directory")
-def extract(run_dir):
-    """
-    Extract features from OOD test set.
-
-    Parameters
-    ----------
-    run_dir : str
-        Name of run directory
-    """
-    print(f"Extracting features at run directory `{run_dir}`...")
-
-    # Prepend checkpoint directory
-    run_dir = os.path.join("checkpoints", "cdc", run_dir)
-
-    # Load model
-    model = load_cdc_model(run_dir)
-
-    # Load hyperparameters
-    hparams = load_hparams(run_dir)
-    # Load datasets
-    dset_dicts = data.load_data(hparams.seen_digits)
-
-    # Extract features on OOD data
-    ood_test_unseen_feats = model.extract_disagreement_features(dset_dicts["ood_test_unseen"])
-
-    # Store features
-    np.savez(os.path.join(run_dir, "ood_test_unseen_feats.npz"), embeds=ood_test_unseen_feats)
 
 
 if __name__ == "__main__":
