@@ -175,7 +175,7 @@ class CNNPopFilter(torch.nn.Module):
         })
 
 
-    def eval(self, id_val_data, ood_val_data, ood_test_data, ood_test_un_data):
+    def run_test(self, id_val_data, ood_val_data, ood_test_data, ood_test_un_data):
         """
         Train first and second model.
 
@@ -223,7 +223,7 @@ def train(filters_path: str):
         for filter_name, filters in create_filters(sampled_filters):
             model = CNNPopFilter(hparams.batch_size, hparams.num_classes, filter_name, filters)
             model = model.to(DEVICE)
-            model.eval(
+            model.run_test(
                 id_val_data=dset_dicts["id_val_seen"],
                 ood_test_data=dset_dicts["ood_test_seen"],
                 ood_val_data=dset_dicts["ood_val_seen"],
