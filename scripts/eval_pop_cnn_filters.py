@@ -68,7 +68,7 @@ def sample_filter(weights1: torch.Tensor, weights2: torch.Tensor, cnn_model_name
     out_channels = torch.tensor(random.sample(range(weights1.shape[0]), 6))
     in_channels = torch.tensor(random.sample(range(weights1.shape[1]), 3))
 
-    sampled_weight = weights1.take(out_channels, dim=0).take(in_channels, dim=1)
+    sampled_weight = weights1.take_along_dim(out_channels, dim=0).take(in_channels, dim=1)
     filter1 = torch.nn.Conv2d(3, 6, kernel_size=3, padding=2) # match LeNet, but with 3x3
     filter1.weight.data = sampled_weight
 
@@ -76,7 +76,7 @@ def sample_filter(weights1: torch.Tensor, weights2: torch.Tensor, cnn_model_name
     out_channels = torch.tensor(random.sample(range(weights2.shape[0]), 16))
     in_channels = torch.tensor(random.sample(range(weights2.shape[1]), 6))
 
-    sampled_weight = weights2.take(out_channels, dim=0).take(in_channels, dim=1)
+    sampled_weight = weights2.take_along_dim(out_channels, dim=0).take(in_channels, dim=1)
     filter2 = torch.nn.Conv2d(6, 16, kernel_size=3) # match LeNet but with 3x3
     filter2.weight.data = sampled_weight
     
