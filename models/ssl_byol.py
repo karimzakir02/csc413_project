@@ -62,11 +62,11 @@ class SSL_BYOL(nn.Module):
 
             transforms.RandomHorizontalFlip(),
 
-            transforms.RandomApply(
-                [transforms.ColorJitter(0.4, 0.4, 0.2, 0.1)], p=0.8
-            ),
+            # transforms.RandomApply(
+            #     [transforms.ColorJitter(0.4, 0.4, 0.2, 0.1)], p=0.8
+            # ),
 
-            transforms.RandomApply([transforms.Grayscale(num_output_channels=3)], p=0.2),
+            # transforms.RandomApply([transforms.Grayscale(num_output_channels=3)], p=0.2),
 
             transforms.GaussianBlur((3, 3))
         ])
@@ -76,13 +76,13 @@ class SSL_BYOL(nn.Module):
             transforms.RandomApply([transforms.RandomCrop((28, 28))], p=0.5),
             transforms.RandomHorizontalFlip(),
 
-            transforms.RandomApply(
-                [transforms.ColorJitter(0.4, 0.4, 0.2, 0.1)], p=0.8
-            ),
+            # transforms.RandomApply(
+            #     [transforms.ColorJitter(0.4, 0.4, 0.2, 0.1)], p=0.8
+            # ),
 
-            transforms.RandomApply([transforms.GaussianBlur((3, 3))], p=0.1),
+            # transforms.RandomApply([transforms.GaussianBlur((3, 3))], p=0.1),
 
-            transforms.RandomSolarize(threshold=0.5, p=0.2)
+            # transforms.RandomSolarize(threshold=0.5, p=0.2)
         ])
 
     def fit(self, train_loader, val_loader, epochs=1000, print_every=100):
@@ -165,10 +165,9 @@ class SSL_BYOL(nn.Module):
 
 
 def train_byol(data):     
-    train_data = torch.utils.data.ConcatDataset([data["id_train_seen"],
-                                                 data["ood_train_seen"]])
+    # train_data = torch.utils.data.ConcatDataset([data["id_train_seen"])
 
-    train_loader = torch.utils.data.DataLoader(train_data, batch_size=64, shuffle=True)
+    train_loader = torch.utils.data.DataLoader(data["id_train_seen"], batch_size=64, shuffle=True)
     val_loader = torch.utils.data.DataLoader(data["id_val_seen"])
 
     ssl_byol = SSL_BYOL(num_classes=5)
