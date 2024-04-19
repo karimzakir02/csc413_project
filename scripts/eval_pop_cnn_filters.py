@@ -18,7 +18,7 @@ import random
 
 # Custom libraries
 from models.backbone import LeNet
-from .train_cdc import HParams, dataloader_to_sampler, compute_accuracy, DEVICE
+from scripts.train_cdc import HParams, compute_accuracy, DEVICE
 from utils import data
 
 from itertools import permutations
