@@ -57,6 +57,9 @@ MODEL_TO_SUBDIR = {
 
     # 4. Self-Supervised Model (trained on OOD data with seen digits)
     "ssl_byol": os.path.join("ssl_byol_encoder"),
+
+    # 5. Pretrained Filters
+    "pretrained_filters": os.path.join("pretrained_filters", "3_x_3_conv"),
 }
 
 
