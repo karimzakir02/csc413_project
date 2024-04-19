@@ -6,20 +6,14 @@ Description: Code to test the popular CNN filters.
 from typing import Any, Dict, Tuple, Iterator
 
 # Standard libraries
-import json
 import os
-from dataclasses import dataclass
-from datetime import datetime
 
 # Non-standard libraries
 import click
 import numpy as np
 import wandb
 import torch
-import torch.nn.functional as F
 from torch.utils.data import DataLoader
-import timm
-import transformers
 import random
 
 # Custom libraries
