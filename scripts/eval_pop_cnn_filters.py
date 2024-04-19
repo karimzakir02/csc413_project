@@ -193,10 +193,71 @@ class CNNPopFilter(torch.nn.Module):
 
         self.eval_filter_pair(*dataloaders)
 
+    @torch.no_grad()
+    def extract_features(self, dataset):
+        """
+        Extract features from model.
+
+        Parameters
+        ----------
+        dataset : torch.utils.data.Dataset
+            Dataset
+
+        Returns
+        -------
+        torch.Tensor
+            Extracted features for each sample in the dataset
+        """
+        self.cnn.eval()
+
+        # Preare dataloader
+        dataloader = DataLoader(dataset, self.batch_size, shuffle=False)
+
+        # Extract features for all data in the adtaset
+        accum_feats = []
+        for X, _ in dataloader:
+            accum_feats.append(self.cnn.extract_features(X).cpu())
+        accum_feats = torch.cat(accum_feats).numpy()
+
+        self.cnn.train()
+        return accum_feats
+
+
 @click.group()
 def cli():
     pass
 
+
+@cli.command()
+@click.option("--filters-path", type=str, help="Path to sampled filters")
+def extract(filters_path: str):
+    """
+    Extract features from OOD test set.
+    """
+    print(f"Extracting features for every model combo...")
+
+     # Evaluate each filter combination
+    hparams = HParams()
+    sampled_filters = np.load(filters_path) # Load sampled CNN filters
+
+    os.makedirs("cnn_embeds", exist_ok=True) # Create directory for embeddings run
+
+    for filters, filter_name in create_filters(sampled_filters):
+        os.makedirs(filter_name, exist_ok=True) # Create directory for filter
+                     
+        model = CNNPopFilter(hparams.batch_size, hparams.num_classes, filter_name, filters)
+        model = model.to(DEVICE)
+    
+        # Load datasets
+        dset_dicts = data.load_data(hparams.seen_digits)
+
+        # Extract features on OOD data
+        ood_test_seen_feats = model.extract_features(dset_dicts["ood_test_seen"])
+        ood_test_unseen_feats = model.extract_features(dset_dicts["ood_test_unseen"])
+
+        # Store features
+        np.savez(os.path.join("cnn_embeds", filter_name, "ood_test_seen_feats.npz"), embeds=ood_test_seen_feats)
+        np.savez(os.path.join("cnn_embeds", filter_name, "ood_test_unseen_feats.npz"), embeds=ood_test_unseen_feats)
 
 @cli.command()
 @click.option("--filters-path", type=str, help="Path to sampled filters")
@@ -214,7 +275,7 @@ def train(filters_path: str):
     
     try:
         # Evaluate each filter combination
-        for filter_name, filters in create_filters(sampled_filters):
+        for filters, filter_name in create_filters(sampled_filters):
             model = CNNPopFilter(hparams.batch_size, hparams.num_classes, filter_name, filters)
             model = model.to(DEVICE)
             model.run_test(
