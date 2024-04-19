@@ -7,3 +7,6 @@ numpy
 zero_init
 wandb
 h5py
+seaborn
+umap
+faiss-cpu
