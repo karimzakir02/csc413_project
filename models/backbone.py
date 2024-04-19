@@ -17,8 +17,8 @@ class LeNet(nn.Module):
         x = self.maxPool(F.relu(self.conv1(x)))
         x = self.maxPool(F.relu(self.conv2(x)))
         x = torch.flatten(x, start_dim=1)
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
+        # x = F.relu(self.fc1(x))
+        # x = F.relu(self.fc2(x))
         return x
     
     def extract_conv_features(self, x):

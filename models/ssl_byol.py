@@ -8,11 +8,8 @@ import torchvision.transforms as transforms
 from copy import deepcopy
 import math
 import os
-import sys
 
-sys.path.append(os.path.abspath("."))
-
-from backbone import LeNet
+from models.backbone import LeNet
 from utils.data import load_data
 
 
@@ -182,7 +179,7 @@ def forward_dataset(encoder, dataset):
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=128, shuffle=False)
     accum_feats = []
     for X, _ in dataloader:
-        accum_feats.append(encoder(X).cpu())
+        accum_feats.append(encoder.extract_features(X).cpu())
     embeddings = torch.cat(accum_feats).numpy()
 
     encoder.train()
@@ -204,6 +201,6 @@ def test_byol(data, data_name):
 
 if __name__=="__main__":
     data = load_data(seen_digits=(0, 3, 5, 6, 8, 9))
-    train_byol(data)
+    # train_byol(data)
     test_byol(data, "ood_test_seen")
     test_byol(data, "ood_test_unseen")
